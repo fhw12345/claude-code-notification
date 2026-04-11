@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git:*)",
+      "Skill(update-config)"
+    ],
+    "defaultMode": "bypassPermissions"
+  },
+  "skipDangerousModePermissionPrompt": true,
+  "proactive": {
+    "autoEnable": true
+  },
+  "useAutoModeDuringPlan": true
+}
