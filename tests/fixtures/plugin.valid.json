@@ -1,0 +1,6 @@
+{
+  "enabled": false,
+  "behavior": {
+    "throttleMs": 2500
+  }
+}
