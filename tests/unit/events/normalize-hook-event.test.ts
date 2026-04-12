@@ -48,4 +48,15 @@ describe("createEventSource", () => {
       at: "2026-04-11T10:00:00Z"
     });
   });
+
+  it("drops unknown-shape payloads and emits debug log", () => {
+    const debug = vi.fn();
+    const source = createEventSource({ debug });
+
+    const event = source.fromHookPayload("not-an-object");
+
+    expect(event).toBeUndefined();
+    expect(debug).toHaveBeenCalledTimes(1);
+    expect(debug).toHaveBeenCalledWith("invalid hook event payload: expected object");
+  });
 });

@@ -9,7 +9,7 @@ export function createEventSource(logger: HookEventNormalizeLogger = {}): EventS
   return {
     fromHookPayload(payload: unknown): AgentEvent | undefined {
       if (!isObject(payload)) {
-        logger.warn?.("invalid hook event payload: expected object");
+        logger.debug?.("invalid hook event payload: expected object");
         return undefined;
       }
 
