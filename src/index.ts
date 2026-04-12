@@ -1,3 +1,1 @@
-export function createNotificationPipeline() {
-  return {};
-}
+export { createNotificationPipeline } from "./runtime/createPipeline";
