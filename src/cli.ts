@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { pathToFileURL } from "node:url";
 import { defaultNotifyConfig } from "./config/defaults";
 import { parseCliArgs } from "./config/parseCliArgs";
 import { resolveConfig } from "./config/resolveConfig";
@@ -92,6 +93,14 @@ export function runCli(argv: string[], deps?: Partial<CliRuntimeDeps>): ResolveC
   return resolved;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+export function isDirectCliExecution(moduleUrl: string, argvEntryPoint: string | undefined): boolean {
+  if (!argvEntryPoint) {
+    return false;
+  }
+
+  return moduleUrl === pathToFileURL(argvEntryPoint).href;
+}
+
+if (isDirectCliExecution(import.meta.url, process.argv[1])) {
   runCli(process.argv);
 }

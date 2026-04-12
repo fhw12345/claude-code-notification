@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { defaultNotifyConfig } from "../../../src/config/defaults";
-import { resolveCliConfig, runCli } from "../../../src/cli";
+import { isDirectCliExecution, resolveCliConfig, runCli } from "../../../src/cli";
 
 describe("resolveCliConfig", () => {
   it("CLI flags override plugin and settings values", () => {
@@ -59,5 +59,19 @@ describe("runCli", () => {
     expect(startListener).toHaveBeenCalledTimes(1);
     expect(startListener).toHaveBeenCalledWith(result.config);
     expect(warn).not.toHaveBeenCalled();
+  });
+});
+
+describe("isDirectCliExecution", () => {
+  it("returns false when argv entrypoint is missing", () => {
+    expect(isDirectCliExecution("file:///repo/src/cli.ts", undefined)).toBe(false);
+  });
+
+  it("matches module URL against normalized entrypoint file URL", () => {
+    expect(isDirectCliExecution("file:///D:/repo/cc-plugin/src/cli.ts", "D:\\repo\\cc-plugin\\src\\cli.ts")).toBe(true);
+  });
+
+  it("returns false when module URL does not match normalized entrypoint", () => {
+    expect(isDirectCliExecution("file:///D:/repo/cc-plugin/src/other.ts", "D:\\repo\\cc-plugin\\src\\cli.ts")).toBe(false);
   });
 });
