@@ -23,3 +23,4 @@ export function resolveConfig(input: ResolveConfigInput, warn: Warn = () => {}):
     config: withCli
   };
 }
+

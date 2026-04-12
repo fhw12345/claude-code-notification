@@ -100,7 +100,7 @@ describe("resolveConfig", () => {
     expect((resolved.config as { channels: { extra: string[] } }).channels.extra).toEqual(["toast"]);
   });
 
-  it("ignores invalid type overrides and warns once per key", () => {
+  it("ignores invalid type overrides and warns once per key even across different invalid types", () => {
     const warn = vi.fn();
 
     const resolved = resolveConfig({
@@ -112,7 +112,7 @@ describe("resolveConfig", () => {
       },
       plugin: {
         behavior: {
-          throttleMs: "faster"
+          throttleMs: false
         } as unknown as { throttleMs: number }
       },
       cli: {}

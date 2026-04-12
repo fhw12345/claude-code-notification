@@ -1,10 +1,10 @@
-import type { Warn } from "./warnOnce";
+import type { WarnOnce } from "./warnOnce";
 
-export function mergeConfig<T>(base: T, override: unknown, warn: Warn = () => {}): T {
+export function mergeConfig<T>(base: T, override: unknown, warn: WarnOnce = () => {}): T {
   return mergeValue(base, override, "", warn) as T;
 }
 
-function mergeValue(base: unknown, override: unknown, path: string, warn: Warn): unknown {
+function mergeValue(base: unknown, override: unknown, path: string, warn: WarnOnce): unknown {
   if (override === undefined) {
     return cloneValue(base);
   }
@@ -51,9 +51,9 @@ function mergeValue(base: unknown, override: unknown, path: string, warn: Warn):
   return cloneValue(override);
 }
 
-function warnInvalid(path: string, expected: unknown, actual: unknown, warn: Warn): void {
+function warnInvalid(path: string, expected: unknown, actual: unknown, warn: WarnOnce): void {
   const keyPath = path || "<root>";
-  warn(`ignored invalid override at ${keyPath}: expected ${describeType(expected)} but got ${describeType(actual)}`);
+  warn(keyPath, `ignored invalid override at ${keyPath}: expected ${describeType(expected)} but got ${describeType(actual)}`);
 }
 
 function describeType(value: unknown): string {
