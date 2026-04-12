@@ -48,11 +48,17 @@ export function createHandleEvent(input: CreateHandleEventInput) {
       return { delivered: false, reason: decision.reason };
     }
 
-    const outcome = await input.adapter.notify(event, input.config);
-    if (!outcome.ok) {
-      return { delivered: false, reason: outcome.reason ?? "notifyFailed", outcome };
-    }
+    try {
+      const outcome = await input.adapter.notify(event, input.config);
+      if (!outcome.ok) {
+        return { delivered: false, reason: outcome.reason ?? "notifyFailed", outcome };
+      }
 
-    return { delivered: true, reason: decision.reason, outcome };
+      return { delivered: true, reason: decision.reason, outcome };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      input.warn(`adapter.notify threw: ${message}`);
+      return { delivered: false, reason: "notifyException" };
+    }
   };
 }
