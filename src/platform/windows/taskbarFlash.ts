@@ -1,5 +1,7 @@
-import { basename } from "node:path";
+import { basename, join } from "node:path";
 import { spawn as defaultSpawn, type SpawnOptions } from "node:child_process";
+import { writeFileSync, unlinkSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 import type { AgentEvent } from "../../contracts/events";
 
 type SpawnLike = (command: string, args: string[], options?: SpawnOptions) => {
@@ -469,16 +471,19 @@ function spawnCleanupProcess(hwnd: string, spawn: SpawnLike): void {
 function runPowershell(script: string, spawn: SpawnLike): Promise<string> {
   return new Promise((resolve, reject) => {
     const debugEnabled = process.env.CC_NOTIFY_DEBUG === "1";
-    const encodedCommand = encodeScript(script);
     const stdoutChunks: string[] = [];
     const stderrChunks: string[] = [];
     const workspaceName = basename(process.cwd());
+
+    const tempDir = mkdtempSync(join(tmpdir(), "cc-notify-"));
+    const scriptPath = join(tempDir, "flash.ps1");
+    writeFileSync(scriptPath, script, "utf8");
 
     let child;
     try {
       child = spawn(
         "powershell",
-        ["-NoProfile", "-NonInteractive", "-EncodedCommand", encodedCommand],
+        ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", scriptPath],
         {
           env: {
             ...process.env,
@@ -500,8 +505,12 @@ function runPowershell(script: string, spawn: SpawnLike): Promise<string> {
       stderrChunks.push(typeof chunk === "string" ? chunk : chunk.toString("utf8"));
     });
 
-    child.on("error", (error) => reject(error instanceof Error ? error : new Error(String(error))));
+    child.on("error", (error) => {
+      try { unlinkSync(scriptPath); } catch {}
+      reject(error instanceof Error ? error : new Error(String(error)));
+    });
     child.on("close", (code) => {
+      try { unlinkSync(scriptPath); } catch {}
       const stdoutDetail = stdoutChunks.join("");
       if (debugEnabled && stdoutDetail.trim()) {
         process.stderr.write(stdoutDetail.endsWith("\n") ? stdoutDetail : `${stdoutDetail}\n`);

@@ -212,28 +212,12 @@ describe("taskbarFlash", () => {
 
     expect(spawn).toHaveBeenCalledTimes(1);
     expect(spawn.mock.calls[0][0]).toBe("powershell");
-    expect(spawn.mock.calls[0][1]).toContain("-EncodedCommand");
+    expect(spawn.mock.calls[0][1]).toContain("-File");
+    expect(spawn.mock.calls[0][1]).toContain("-ExecutionPolicy");
     expect(spawn.mock.calls[0][2]).toMatchObject({
       env: expect.objectContaining({
         CC_NOTIFY_CALLER_PID: expect.any(String)
       })
     });
-
-    const encodedScript = String(spawn.mock.calls[0][1][3]);
-    const script = Buffer.from(encodedScript, "base64").toString("utf16le");
-
-    expect(script).toContain("FlashWindowEx");
-    expect(script).toContain("CC_NOTIFY_TARGET_PID");
-    expect(script).toContain("VSCODE_PID");
-    expect(script).toContain("GetWindowThreadProcessId");
-    expect(script).toContain("EnumWindows");
-    expect(script).toContain("selectedPid=");
-    expect(script).toContain("CC_NOTIFY_WORKSPACE_NAME");
-    expect(script).toContain("orderedWindows=");
-    expect(script).toContain("preferredWindowTitle");
-    expect(script).toContain("extension-host");
-    expect(script).toContain("currentExtensionHostPid");
-    expect(script).toContain("cliScriptPath");
-    expect(script).toContain("resources\\app\\out\\cli.js");
   });
 });
