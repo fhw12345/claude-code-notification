@@ -30,14 +30,14 @@ export function parseCliArgs(args: string[]): ParseResult {
       continue;
     }
 
-    if (flag === "--notify-channel-toast") {
+    if (flag === "--notify-channel-taskbar-flash") {
       const parsed = parseBoolean(rawValue);
       if (parsed === undefined) {
-        warnings.push(`invalid boolean for --notify-channel-toast: ${rawValue}`);
+        warnings.push(`invalid boolean for --notify-channel-taskbar-flash: ${rawValue}`);
       } else {
         value.channels = {
           ...(value.channels ?? {}),
-          toast: parsed
+          taskbarFlash: parsed
         };
       }
       continue;

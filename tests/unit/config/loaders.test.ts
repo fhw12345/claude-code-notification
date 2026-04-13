@@ -84,7 +84,7 @@ describe("parseCliArgs", () => {
   it("parses valid cli args into partial config without warnings", () => {
     const result = parseCliArgs([
       "--notify-enabled=false",
-      "--notify-channel-toast=true",
+      "--notify-channel-taskbar-flash=false",
       "--notify-event-task-failed=false",
       "--notify-behavior-throttle-ms=1200"
     ]);
@@ -92,7 +92,7 @@ describe("parseCliArgs", () => {
     expect(result.value).toEqual({
       enabled: false,
       channels: {
-        toast: true
+        taskbarFlash: false
       },
       events: {
         taskFailed: false

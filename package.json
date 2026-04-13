@@ -2,11 +2,20 @@
   "name": "cc-plugin-notification",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
+  "bin": {
+    "cc-plugin-notification": "./src/cli.ts"
+  },
   "scripts": {
-    "test": "vitest"
+    "test": "vitest",
+    "demo:notify:ok": "node ./scripts/run-demo-notify.mjs ok",
+    "demo:notify:badjson": "node ./scripts/run-demo-notify.mjs badjson",
+    "demo:notify:debug": "node ./scripts/run-demo-notify.mjs ok --debug",
+    "demo:notify:inspect": "node ./scripts/inspect-notify-target.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.7.2",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   }

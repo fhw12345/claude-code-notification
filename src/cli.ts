@@ -5,10 +5,13 @@ import { defaultNotifyConfig } from "./config/defaults";
 import { parseCliArgs } from "./config/parseCliArgs";
 import { resolveConfig } from "./config/resolveConfig";
 import type { NotifyConfig } from "./contracts/config";
+import { createWindowsNotifier } from "./platform/windows/windowsNotifier";
+import { createNotificationPipeline } from "./runtime/createPipeline";
 
 export type CliRuntimeDeps = {
   warn: (message: string) => void;
   startListener: (config: NotifyConfig) => void;
+  handlePayload: (payload: unknown) => Promise<void>;
 };
 
 export type ResolveCliConfigInput = {
@@ -63,9 +66,9 @@ function parseHookPayload(raw: string, warn: (message: string) => void): unknown
 
 export function startNotificationPipelineListener(
   config: NotifyConfig,
-  deps: Pick<CliRuntimeDeps, "warn">
+  deps: Pick<CliRuntimeDeps, "warn" | "handlePayload">
 ): void {
-  const { warn } = deps;
+  const { warn, handlePayload } = deps;
 
   process.stdin.setEncoding("utf8");
 
@@ -75,7 +78,13 @@ export function startNotificationPipelineListener(
   });
 
   process.stdin.on("end", () => {
-    parseHookPayload(buffer, warn);
+    const payload = parseHookPayload(buffer, warn);
+    if (payload !== undefined) {
+      void handlePayload(payload).catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        warn(`failed to process hook payload: ${message}`);
+      });
+    }
   });
 
   process.stdin.resume();
@@ -87,7 +96,21 @@ export function runCli(argv: string[], deps?: Partial<CliRuntimeDeps>): ResolveC
   const warn = deps?.warn ?? ((message: string) => console.warn(message));
   const resolved = resolveCliConfig({ args: argv.slice(2), warn });
 
-  const startListener = deps?.startListener ?? ((config: NotifyConfig) => startNotificationPipelineListener(config, { warn }));
+  const pipeline = createNotificationPipeline({
+    adapter: createWindowsNotifier(),
+    defaults: defaultNotifyConfig,
+    cli: resolved.config,
+    warn
+  });
+
+  const handlePayload = deps?.handlePayload ?? (async (payload: unknown) => {
+    const result = await pipeline.handleEvent(payload as Record<string, unknown>);
+    if (process.env.CC_PLUGIN_E2E_OUTPUT === "1") {
+      process.stdout.write(`${JSON.stringify(result)}\n`);
+    }
+  });
+
+  const startListener = deps?.startListener ?? ((config: NotifyConfig) => startNotificationPipelineListener(config, { warn, handlePayload }));
   startListener(resolved.config);
 
   return resolved;

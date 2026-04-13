@@ -10,4 +10,12 @@ export type NotifyConfig = {
     needsInput: boolean;
     progressUpdate: boolean;
   };
+  behavior: {
+    notifyWhenTerminalFocused: boolean;
+    throttleMs: number;
+    quietHours?: {
+      start: string;
+      end: string;
+    };
+  };
 };
