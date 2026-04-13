@@ -7,14 +7,14 @@ Windows taskbar flash notifications for Claude Code. Alerts you when tasks compl
 In Claude Code, run:
 
 ```
-claude plugin marketplace add haowenfeng/claude-code-notification
+claude plugin marketplace add fhw12345/claude-code-notification
 claude plugin install cc-plugin-notification@cc-notification-marketplace
 ```
 
 Or from inside a Claude Code session:
 
 ```
-/plugin marketplace add haowenfeng/claude-code-notification
+/plugin marketplace add fhw12345/claude-code-notification
 /plugin install cc-plugin-notification@cc-notification-marketplace
 ```
 

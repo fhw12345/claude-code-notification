@@ -5,7 +5,7 @@
   "author": {
     "name": "Haowen Feng"
   },
-  "repository": "https://github.com/user/claude-code-notification",
+  "repository": "https://github.com/fhw12345/claude-code-notification",
   "license": "MIT",
   "keywords": ["notification", "windows", "taskbar", "flash", "alert"]
 }

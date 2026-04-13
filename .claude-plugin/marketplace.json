@@ -14,7 +14,8 @@
         "name": "Haowen Feng"
       },
       "source": ".",
-      "category": "productivity",
+      "homepage": "https://github.com/fhw12345/claude-code-notification#readme",
+      "repository": "https://github.com/fhw12345/claude-code-notification",
       "license": "MIT",
       "keywords": [
         "notification",
