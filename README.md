@@ -4,11 +4,17 @@ Windows taskbar flash notifications for Claude Code. Alerts you when tasks compl
 
 ## Install
 
-```bash
-# 1. Add the marketplace
-/plugin marketplace add haowenfeng/claude-code-notification
+In Claude Code, run:
 
-# 2. Install the plugin
+```
+claude plugin marketplace add haowenfeng/claude-code-notification
+claude plugin install cc-plugin-notification@cc-notification-marketplace
+```
+
+Or from inside a Claude Code session:
+
+```
+/plugin marketplace add haowenfeng/claude-code-notification
 /plugin install cc-plugin-notification@cc-notification-marketplace
 ```
 
