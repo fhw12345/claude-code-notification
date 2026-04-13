@@ -12,6 +12,7 @@ type HookPayload = {
   at?: unknown;
   hook_event_name?: unknown;
   notification_type?: unknown;
+  last_assistant_message?: unknown;
 };
 
 export type HookEventNormalizeLogger = {
@@ -20,6 +21,16 @@ export type HookEventNormalizeLogger = {
 };
 
 export function normalizeHookEvent(payload: HookPayload, logger: HookEventNormalizeLogger = {}): AgentEvent | undefined {
+  // Claude Code Stop hook payload: { hook_event_name: "Stop", last_assistant_message: "...", ... }
+  if (typeof payload.hook_event_name === "string" && payload.hook_event_name === "Stop") {
+    return {
+      type: "notification",
+      notificationType: "stop",
+      message: isString(payload.last_assistant_message) ? payload.last_assistant_message : "Claude finished",
+      title: undefined
+    };
+  }
+
   // Claude Code Notification hook payload: { hook_event_name: "Notification", notification_type: "...", message: "..." }
   if (typeof payload.hook_event_name === "string" && payload.hook_event_name === "Notification") {
     if (!isString(payload.notification_type) || !isString(payload.message)) {
