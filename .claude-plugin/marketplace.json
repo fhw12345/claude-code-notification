@@ -13,7 +13,7 @@
       "author": {
         "name": "Haowen Feng"
       },
-      "source": ".",
+      "source": "./",
       "homepage": "https://github.com/fhw12345/claude-code-notification#readme",
       "repository": "https://github.com/fhw12345/claude-code-notification",
       "license": "MIT",
