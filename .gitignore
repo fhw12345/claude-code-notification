@@ -1,1 +1,4 @@
+node_modules/
 .worktrees/
+scripts/debug-*.ps1
+scripts/debug-*.mjs
