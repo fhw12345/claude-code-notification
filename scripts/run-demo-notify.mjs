@@ -27,7 +27,8 @@ const child = spawn(
     "--notify-enabled=true",
     "--notify-event-task-failed=true",
     "--notify-channel-taskbar-flash=true",
-    "--notify-behavior-throttle-ms=0"
+    "--notify-behavior-throttle-ms=0",
+    "--notify-behavior-quiet-hours=off"
   ],
   {
     stdio: ["pipe", "inherit", "inherit"],

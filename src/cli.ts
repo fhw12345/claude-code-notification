@@ -98,8 +98,7 @@ export function runCli(argv: string[], deps?: Partial<CliRuntimeDeps>): ResolveC
 
   const pipeline = createNotificationPipeline({
     adapter: createWindowsNotifier(),
-    defaults: defaultNotifyConfig,
-    cli: resolved.config,
+    defaults: resolved.config,
     warn
   });
 

@@ -9,6 +9,10 @@ function mergeValue(base: unknown, override: unknown, path: string, warn: WarnOn
     return cloneValue(base);
   }
 
+  if (override === null) {
+    return undefined;
+  }
+
   if (Array.isArray(base)) {
     if (!Array.isArray(override)) {
       warnInvalid(path, base, override, warn);

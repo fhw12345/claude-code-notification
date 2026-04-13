@@ -288,8 +288,9 @@ function buildFlashScript(): string {
     "    if ($browserPathMatch.Success) { $currentBrowserPath = $browserPathMatch.Groups[1].Value }",
     "  }",
     "}",
+    "$shellNames = @('powershell.exe','pwsh.exe','cmd.exe','bash.exe','sh.exe','zsh.exe','fish.exe','node.exe','claude.exe','git.exe');",
     "foreach ($proc in $processChain) {",
-    "  if (-not $candidatePids.Contains($proc.ProcessId)) { $candidatePids.Add($proc.ProcessId) | Out-Null; }",
+    "  if (-not $candidatePids.Contains($proc.ProcessId) -and $shellNames -notcontains $proc.Name.ToLowerInvariant()) { $candidatePids.Add($proc.ProcessId) | Out-Null; }",
     "}",
     "if ($debugEnabled) { Write-Output ('cc-notify debug: candidatePids=' + ($candidatePids -join ',')) }",
     "$windowsByPid = @{};",
@@ -411,7 +412,22 @@ function buildFlashScript(): string {
     "$fw.dwFlags = 14;",
     "$fw.uCount = 0;",
     "$fw.dwTimeout = 0;",
-    "[void][Win32Flash]::FlashWindowEx([ref]$fw)"
+    "[void][Win32Flash]::FlashWindowEx([ref]$fw);",
+    "Write-Output ('hwnd=' + $hwnd)"
+  ].join("\n");
+}
+
+function buildCleanupScript(hwnd: string): string {
+  return [
+    "Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public struct FI { public UInt32 cbSize; public IntPtr hwnd; public UInt32 dwFlags; public UInt32 uCount; public UInt32 dwTimeout; } public static class FC { [DllImport(\"user32.dll\")] public static extern bool FlashWindowEx(ref FI p); [DllImport(\"user32.dll\")] public static extern IntPtr GetForegroundWindow(); }';",
+    `$h = [IntPtr]${hwnd};`,
+    "for ($i=0; $i -lt 120; $i++) {",
+    "  Start-Sleep -Milliseconds 500;",
+    "  if ([FC]::GetForegroundWindow() -eq $h) {",
+    "    $f = New-Object FI; $f.cbSize = [System.Runtime.InteropServices.Marshal]::SizeOf($f); $f.hwnd = $h; $f.dwFlags = 0; $f.uCount = 0; $f.dwTimeout = 0;",
+    "    [void][FC]::FlashWindowEx([ref]$f); break",
+    "  }",
+    "}"
   ].join("\n");
 }
 
@@ -420,10 +436,29 @@ function encodeScript(script: string): string {
 }
 
 export async function flashTaskbar(_event: AgentEvent, deps: TaskbarDeps = { spawn: defaultSpawn as unknown as SpawnLike }): Promise<void> {
-  await runPowershell(buildFlashScript(), deps.spawn);
+  const stdout = await runPowershell(buildFlashScript(), deps.spawn);
+  const hwndMatch = stdout.match(/hwnd=(\d+)/);
+  if (hwndMatch) {
+    spawnCleanupProcess(hwndMatch[1], deps.spawn);
+  }
 }
 
-function runPowershell(script: string, spawn: SpawnLike): Promise<void> {
+function spawnCleanupProcess(hwnd: string, spawn: SpawnLike): void {
+  const script = buildCleanupScript(hwnd);
+  const encoded = encodeScript(script);
+  try {
+    const child = spawn(
+      "powershell",
+      ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-EncodedCommand", encoded],
+      { detached: true, stdio: "ignore" } as SpawnOptions
+    );
+    child.on("error", () => {});
+  } catch {
+    // cleanup is best-effort
+  }
+}
+
+function runPowershell(script: string, spawn: SpawnLike): Promise<string> {
   return new Promise((resolve, reject) => {
     const debugEnabled = process.env.CC_NOTIFY_DEBUG === "1";
     const encodedCommand = encodeScript(script);
@@ -465,7 +500,7 @@ function runPowershell(script: string, spawn: SpawnLike): Promise<void> {
       }
 
       if (typeof code === "number" && code === 0) {
-        resolve();
+        resolve(stdoutDetail);
         return;
       }
 

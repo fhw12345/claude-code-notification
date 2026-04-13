@@ -1,0 +1,28 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "cc-notification-marketplace",
+  "description": "Windows taskbar flash notifications for Claude Code",
+  "owner": {
+    "name": "Haowen Feng"
+  },
+  "plugins": [
+    {
+      "name": "cc-plugin-notification",
+      "description": "Windows taskbar flash notifications when Claude Code tasks complete, fail, or need input",
+      "version": "0.1.0",
+      "author": {
+        "name": "Haowen Feng"
+      },
+      "source": ".",
+      "category": "productivity",
+      "license": "MIT",
+      "keywords": [
+        "notification",
+        "windows",
+        "taskbar",
+        "flash",
+        "alert"
+      ]
+    }
+  ]
+}

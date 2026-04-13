@@ -66,6 +66,26 @@ export function parseCliArgs(args: string[]): ParseResult {
           throttleMs: parsed
         };
       }
+      continue;
+    }
+
+    if (flag === "--notify-behavior-quiet-hours") {
+      if (rawValue === "off") {
+        value.behavior = {
+          ...(value.behavior ?? {}),
+          quietHours: null as unknown as undefined
+        };
+      } else {
+        const match = rawValue.match(/^(\d{2}:\d{2})-(\d{2}:\d{2})$/);
+        if (!match) {
+          warnings.push(`invalid value for --notify-behavior-quiet-hours: ${rawValue} (use "HH:MM-HH:MM" or "off")`);
+        } else {
+          value.behavior = {
+            ...(value.behavior ?? {}),
+            quietHours: { start: match[1], end: match[2] }
+          };
+        }
+      }
     }
   }
 

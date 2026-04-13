@@ -10,11 +10,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Demo (runs CLI with sample payload):
   - `npm run demo:notify:ok`
   - `npm run demo:notify:badjson`
+  - `npm run demo:notify:debug` (with debug output)
+  - `npm run demo:notify:inspect` (inspect notification target)
+- No build step — CLI runs directly from `.ts` via `tsx`.
 
 ## Architecture overview
 
 - **Entry points**
-  - CLI: `src/cli.ts` (bin: `cc-plugin-notification`). Reads JSON payload from stdin, resolves config, runs pipeline. Emits JSON result when `CC_PLUGIN_E2E_OUTPUT=1`.
+  - CLI: `src/cli.ts` (bin: `cc-plugin-notification`). Reads JSON payload from stdin, resolves config, runs pipeline. Set `CC_PLUGIN_E2E_OUTPUT=1` to emit JSON result on stdout (used by integration tests).
   - Library: `src/index.ts` exports `createNotificationPipeline`.
 
 - **Runtime pipeline** (`src/runtime/*`)

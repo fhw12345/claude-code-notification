@@ -1,0 +1,16 @@
+{
+  "description": "Windows taskbar flash notifications when Claude Code tasks complete, fail, or need input",
+  "hooks": {
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx --prefix ${CLAUDE_PLUGIN_ROOT} tsx ${CLAUDE_PLUGIN_ROOT}/src/cli.ts --notify-enabled=true --notify-channel-taskbar-flash=true --notify-behavior-quiet-hours=off",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

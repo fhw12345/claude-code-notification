@@ -40,6 +40,39 @@ describe("resolveCliConfig", () => {
     expect(result.warnings).toEqual(["invalid boolean for --notify-enabled: maybe"]);
     expect(warn).toHaveBeenCalledWith("invalid boolean for --notify-enabled: maybe");
   });
+
+  it("--notify-behavior-quiet-hours=off disables quiet hours", () => {
+    const result = resolveCliConfig({
+      args: ["--notify-behavior-quiet-hours=off"],
+      defaults: defaultNotifyConfig
+    });
+
+    expect(result.config.behavior.quietHours).toBeUndefined();
+  });
+
+  it("--notify-behavior-quiet-hours=HH:MM-HH:MM sets quiet hours", () => {
+    const result = resolveCliConfig({
+      args: ["--notify-behavior-quiet-hours=23:00-07:00"],
+      defaults: defaultNotifyConfig
+    });
+
+    expect(result.config.behavior.quietHours).toEqual({ start: "23:00", end: "07:00" });
+  });
+
+  it("--notify-behavior-quiet-hours warns on invalid format", () => {
+    const warn = vi.fn();
+
+    const result = resolveCliConfig({
+      args: ["--notify-behavior-quiet-hours=banana"],
+      defaults: defaultNotifyConfig,
+      warn
+    });
+
+    expect(result.config.behavior.quietHours).toEqual(defaultNotifyConfig.behavior.quietHours);
+    expect(result.warnings).toEqual([
+      'invalid value for --notify-behavior-quiet-hours: banana (use "HH:MM-HH:MM" or "off")'
+    ]);
+  });
 });
 
 describe("runCli", () => {
