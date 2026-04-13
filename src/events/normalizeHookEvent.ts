@@ -10,6 +10,8 @@ type HookPayload = {
   prompt?: unknown;
   message?: unknown;
   at?: unknown;
+  hook_event_name?: unknown;
+  notification_type?: unknown;
 };
 
 export type HookEventNormalizeLogger = {
@@ -18,6 +20,21 @@ export type HookEventNormalizeLogger = {
 };
 
 export function normalizeHookEvent(payload: HookPayload, logger: HookEventNormalizeLogger = {}): AgentEvent | undefined {
+  // Claude Code Notification hook payload: { hook_event_name: "Notification", notification_type: "...", message: "..." }
+  if (typeof payload.hook_event_name === "string" && payload.hook_event_name === "Notification") {
+    if (!isString(payload.notification_type) || !isString(payload.message)) {
+      logger.warn?.("invalid Notification hook payload: missing notification_type or message");
+      return undefined;
+    }
+
+    return {
+      type: "notification",
+      notificationType: payload.notification_type,
+      message: payload.message,
+      title: isString(payload.title) ? payload.title : undefined
+    };
+  }
+
   const kind = typeof payload.kind === "string" ? payload.kind : undefined;
 
   if (!kind) {

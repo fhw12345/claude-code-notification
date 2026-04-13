@@ -10,7 +10,8 @@ export const defaultNotifyConfig: NotifyConfig = {
     taskCompleted: true,
     taskFailed: true,
     needsInput: true,
-    progressUpdate: true
+    progressUpdate: true,
+    notification: true
   },
   behavior: {
     notifyWhenTerminalFocused: false,

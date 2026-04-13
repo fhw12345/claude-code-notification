@@ -19,6 +19,8 @@ function isEventEnabled(event: AgentEvent, config: NotifyConfig): boolean {
       return config.events.needsInput;
     case "progressUpdate":
       return config.events.progressUpdate;
+    case "notification":
+      return config.events.notification;
     default:
       return false;
   }

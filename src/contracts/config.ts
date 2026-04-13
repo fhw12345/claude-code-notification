@@ -9,6 +9,7 @@ export type NotifyConfig = {
     taskFailed: boolean;
     needsInput: boolean;
     progressUpdate: boolean;
+    notification: boolean;
   };
   behavior: {
     notifyWhenTerminalFocused: boolean;
