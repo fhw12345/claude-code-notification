@@ -1,4 +1,6 @@
 node_modules/
 .worktrees/
+.claude/settings.local.json
+.claude/settings.json
 scripts/debug-*.ps1
 scripts/debug-*.mjs
