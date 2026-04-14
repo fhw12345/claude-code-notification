@@ -1,5 +1,5 @@
 ---
-description: View or modify notification plugin settings (sound, debug, events, etc.)
+description: View or modify notification plugin settings (sound, debug, notifyOn, etc.)
 argument-hint: "Optional: key=value to set, or 'show' to display current config"
 allowed-tools: ["Read", "Write", "Bash", "AskUserQuestion"]
 ---
@@ -24,10 +24,7 @@ The config file is at `$CLAUDE_PLUGIN_DATA/config.json` (environment variable `C
   "soundFile": "",
   "debug": false,
   "logFile": "",
-  "events": {
-    "stop": true,
-    "notification": true
-  }
+  "notifyOn": "Stop,Notification"
 }
 ```
 
@@ -38,10 +35,22 @@ The config file is at `$CLAUDE_PLUGIN_DATA/config.json` (environment variable `C
 | `enabled` | bool | `true` | Master switch for all notifications |
 | `sound` | `"on"` / `"off"` | `"on"` | Play sound when notifying |
 | `soundFile` | string | `""` | Path to custom .wav file (empty = system sound) |
-| `debug` | bool | `false` | Enable debug logging to stdout |
+| `debug` | bool | `false` | Enable debug logging |
 | `logFile` | string | `""` | Custom log file path (empty = plugin data dir) |
-| `events.stop` | bool | `true` | Notify on every assistant response |
-| `events.notification` | bool | `true` | Notify on CC idle/permission events |
+| `notifyOn` | string | `"Stop,Notification"` | Comma-separated hook event types to notify on. Check log for available types. |
+
+### notifyOn values
+
+The value is a comma-separated list of CC hook event names. Known types:
+
+- `Stop` — every assistant response
+- `Notification` — idle prompt, permission prompt, auth, etc.
+
+Users can check `notification.log` (with `debug=true`) to see all event types and their subtypes, then adjust `notifyOn` accordingly. Example:
+
+- `"Stop,Notification"` — notify on everything (default)
+- `"Notification"` — only notify on idle/permission events, not every response
+- `"Stop"` — only notify on responses, not idle events
 
 ## Instructions
 

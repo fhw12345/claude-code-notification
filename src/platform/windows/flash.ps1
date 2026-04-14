@@ -24,15 +24,9 @@ $dryRun       = (Get-Setting 'dryRun'    'CC_NOTIFY_DRY_RUN'    'false') -ieq '1
 $soundEnabled = (Get-Setting 'sound'     'CC_NOTIFY_SOUND'      'on') -ine 'off'
 $soundFile    =  Get-Setting 'soundFile' 'CC_NOTIFY_SOUND_FILE' ''
 $logFileCfg   =  Get-Setting 'logFile'   'CC_NOTIFY_LOG_FILE'   ''
-
-# Events config (nested object)
-$eventsStop         = $true
-$eventsNotification = $true
-if ($config.PSObject.Properties['events'] 2>$null) {
-    $ev = $config.events
-    if ($null -ne $ev.PSObject.Properties['stop'] 2>$null)         { $eventsStop         = [string]$ev.stop -ine 'false' }
-    if ($null -ne $ev.PSObject.Properties['notification'] 2>$null) { $eventsNotification = [string]$ev.notification -ine 'false' }
-}
+$notifyOn     =  Get-Setting 'notifyOn'  'CC_NOTIFY_ON'         'Stop,Notification'
+# Parse notifyOn into a set of lowercase event names
+$notifyOnSet  = @($notifyOn -split ',' | ForEach-Object { $_.Trim().ToLowerInvariant() } | Where-Object { $_ -ne '' })
 
 $workspaceName = $env:CC_NOTIFY_WORKSPACE_NAME
 if ([string]::IsNullOrWhiteSpace($workspaceName)) {
@@ -65,6 +59,8 @@ if (-not $enabled) {
 # --- Check event type filter ---
 # Hook payload comes via stdin as JSON; peek at hook_event_name to filter
 $hookEventName = ''
+$notificationType = ''
+$stopReason = ''
 $stdinContent = ''
 if (-not [Console]::IsInputRedirected) {
     # no stdin — likely direct invocation, allow
@@ -73,17 +69,20 @@ if (-not [Console]::IsInputRedirected) {
         $stdinContent = [Console]::In.ReadToEnd()
         if (-not [string]::IsNullOrWhiteSpace($stdinContent)) {
             $payload = $stdinContent | ConvertFrom-Json -ErrorAction SilentlyContinue
-            if ($payload) { $hookEventName = [string]$payload.hook_event_name }
+            if ($payload) {
+                $hookEventName = [string]$payload.hook_event_name
+                $notificationType = [string]$payload.notification_type
+                $stopReason = [string]$payload.reason
+            }
         }
     } catch {}
 }
 
-if ($hookEventName -eq 'Stop' -and -not $eventsStop) {
-    Write-DebugLog "event 'Stop' disabled by config"
-    exit 0
-}
-if ($hookEventName -eq 'Notification' -and -not $eventsNotification) {
-    Write-DebugLog "event 'Notification' disabled by config"
+# Log the full event type for analysis
+Write-DebugLog ("payload: " + $stdinContent.Trim())
+
+if ($hookEventName -ne '' -and $notifyOnSet -notcontains $hookEventName.ToLowerInvariant()) {
+    Write-DebugLog ("event '" + $hookEventName + "' not in notifyOn=[" + ($notifyOnSet -join ',') + "], skipping")
     exit 0
 }
 
