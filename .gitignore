@@ -6,3 +6,4 @@ debug-*
 *.log
 scripts/debug-*.ps1
 scripts/debug-*.mjs
+announcement.md
