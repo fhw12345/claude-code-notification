@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 
 const flashScript = join(__dirname, "../../src/platform/windows/flash.ps1");
@@ -179,5 +179,61 @@ describe("flash.ps1 E2E", () => {
     expect(exitCode).toBe(0);
     expect(stdout).toContain("flashed hwnd=");
     expect(stdout).not.toContain("sound:");
+  });
+
+  it("debounce skips when called twice rapidly", () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "cc-notify-debounce-"));
+    const lockFile = join(tempDir, "notification.lock");
+    // Write a recent lock file (just now)
+    writeFileSync(lockFile, "");
+    try {
+      const { stdout, exitCode } = runFlash({
+        CC_NOTIFY_DEBOUNCE_MS: "10000",
+        CC_NOTIFY_DEBOUNCE_LOCK_FILE: lockFile,
+        CLAUDE_PLUGIN_DATA: tempDir
+      });
+      expect(exitCode).toBe(0);
+      expect(stdout).toContain("debounced");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("debounce allows when lock file is old", () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "cc-notify-debounce-"));
+    const lockFile = join(tempDir, "notification.lock");
+    // Write a lock file and backdate it
+    writeFileSync(lockFile, "");
+    const past = new Date(Date.now() - 5000);
+    const { utimesSync } = require("node:fs");
+    utimesSync(lockFile, past, past);
+    try {
+      const { stdout, exitCode } = runFlash({
+        CC_NOTIFY_DEBOUNCE_MS: "1",
+        CC_NOTIFY_DEBOUNCE_LOCK_FILE: lockFile,
+        CLAUDE_PLUGIN_DATA: tempDir
+      });
+      expect(exitCode).toBe(0);
+      expect(stdout).not.toContain("debounced");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("debounce is disabled when debounceMs=0", () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "cc-notify-debounce-"));
+    const lockFile = join(tempDir, "notification.lock");
+    writeFileSync(lockFile, "");
+    try {
+      const { stdout, exitCode } = runFlash({
+        CC_NOTIFY_DEBOUNCE_MS: "0",
+        CC_NOTIFY_DEBOUNCE_LOCK_FILE: lockFile,
+        CLAUDE_PLUGIN_DATA: tempDir
+      });
+      expect(exitCode).toBe(0);
+      expect(stdout).not.toContain("debounced");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 });

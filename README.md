@@ -85,7 +85,8 @@ The config file is stored at `~/.claude/plugins/data/cc-plugin-notification-.../
   "logFile": "",
   "notifyOn": "normal",
   "quietHours": "",
-  "notifyWhenFocused": false
+  "notifyWhenFocused": false,
+  "debounceMs": 3000
 }
 ```
 
@@ -101,6 +102,7 @@ The config file is stored at `~/.claude/plugins/data/cc-plugin-notification-.../
 | `notifyWhenFocused` | bool | `false` | Notify even when the host window is in foreground |
 | `debug` | bool | `false` | Enable debug logging |
 | `logFile` | string | `""` | Custom log file path (empty = default in plugin data dir) |
+| `debounceMs` | number | `3000` | Minimum milliseconds between notifications (prevents rapid-fire) |
 
 ### Environment variable overrides
 
@@ -116,6 +118,7 @@ Environment variables take precedence over the config file:
 | `CC_NOTIFY_WHEN_FOCUSED` | `notifyWhenFocused` | `true` / `false` |
 | `CC_NOTIFY_DEBUG` | `debug` | `1` / `0` |
 | `CC_NOTIFY_LOG_FILE` | `logFile` | file path |
+| `CC_NOTIFY_DEBOUNCE_MS` | `debounceMs` | milliseconds (e.g. `3000`) |
 | `CC_NOTIFY_TARGET_PID` | — | Override target window PID |
 | `CC_NOTIFY_DRY_RUN` | — | `1` to find window without flashing |
 
@@ -144,6 +147,12 @@ All hook payloads are logged to `~/.claude/plugins/data/cc-plugin-notification-.
 - **Nothing flashes**: Enable debug logging and check `notification.log`
 - **No sound**: Check `sound` is not `"off"` in config
 - **Custom sound not playing**: Ensure the file exists and is a valid `.wav` file
+
+## Roadmap
+
+- **Cross-platform support** — macOS (osascript/Dock bounce) and Linux (notify-send) notifications
+- **Toast notifications** — Windows toast popups with message preview
+- **Per-event sounds** — different sounds for different event types
 
 ## Requirements
 

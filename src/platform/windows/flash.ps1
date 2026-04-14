@@ -26,6 +26,7 @@ $dryRun       = $dryRunVal -ieq '1' -or $dryRunVal -ieq 'true'
 $soundEnabled = (Get-Setting 'sound'     'CC_NOTIFY_SOUND'      'on') -ine 'off'
 $soundFile    =  Get-Setting 'soundFile' 'CC_NOTIFY_SOUND_FILE' ''
 $logFileCfg   =  Get-Setting 'logFile'   'CC_NOTIFY_LOG_FILE'   ''
+$debounceMs   = [int](Get-Setting 'debounceMs' 'CC_NOTIFY_DEBOUNCE_MS' '3000')
 $notifyOn     =  Get-Setting 'notifyOn'  'CC_NOTIFY_ON'         'normal'
 $quietHours   =  Get-Setting 'quietHours' 'CC_NOTIFY_QUIET_HOURS' ''
 $notifyWhenFocusedVal = Get-Setting 'notifyWhenFocused' 'CC_NOTIFY_WHEN_FOCUSED' 'false'
@@ -122,6 +123,35 @@ if (-not [string]::IsNullOrWhiteSpace($logFile) -and -not [string]::IsNullOrWhit
 if ($hookEventName -ne '' -and $notifyOnSet -notcontains $hookEventName.ToLowerInvariant()) {
     Write-DebugLog ("event '" + $hookEventName + "' not in notifyOn=[" + ($notifyOnSet -join ',') + "], skipping")
     exit 0
+}
+
+# --- Debounce ---
+if ($debounceMs -gt 0) {
+    $lockDir = $env:CLAUDE_PLUGIN_DATA
+    if (-not [string]::IsNullOrWhiteSpace($env:CC_NOTIFY_DEBOUNCE_LOCK_FILE)) {
+        $lockPath = $env:CC_NOTIFY_DEBOUNCE_LOCK_FILE
+    } elseif (-not [string]::IsNullOrWhiteSpace($lockDir)) {
+        $lockPath = Join-Path $lockDir 'notification.lock'
+    } else {
+        $lockPath = ''
+    }
+    if (-not [string]::IsNullOrWhiteSpace($lockPath)) {
+        if ([System.IO.File]::Exists($lockPath)) {
+            $lastWrite = [System.IO.File]::GetLastWriteTimeUtc($lockPath)
+            $elapsed = ([System.DateTime]::UtcNow - $lastWrite).TotalMilliseconds
+            if ($elapsed -lt $debounceMs) {
+                Write-DebugLog ("debounced: " + [int]$elapsed + "ms < " + $debounceMs + "ms since last notification")
+                exit 0
+            }
+        }
+        # Touch the lock file
+        $lockFileDir = Split-Path -Parent $lockPath
+        if (-not [string]::IsNullOrWhiteSpace($lockFileDir) -and -not (Test-Path -LiteralPath $lockFileDir)) {
+            New-Item -ItemType Directory -Path $lockFileDir -Force -ErrorAction SilentlyContinue | Out-Null
+        }
+        [System.IO.File]::WriteAllText($lockPath, '')
+        Write-DebugLog ("debounce lock updated: " + $lockPath)
+    }
 }
 
 # --- Win32 API ---

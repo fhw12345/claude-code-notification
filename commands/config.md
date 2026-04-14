@@ -26,7 +26,8 @@ The config file is at `$CLAUDE_PLUGIN_DATA/config.json` (environment variable `C
   "logFile": "",
   "notifyOn": "normal",
   "quietHours": "",
-  "notifyWhenFocused": false
+  "notifyWhenFocused": false,
+  "debounceMs": 3000
 }
 ```
 
@@ -42,6 +43,7 @@ The config file is at `$CLAUDE_PLUGIN_DATA/config.json` (environment variable `C
 | `notifyWhenFocused` | bool | `false` | Notify even when the host window is in foreground |
 | `debug` | bool | `false` | Enable debug logging |
 | `logFile` | string | `""` | Custom log file path (empty = plugin data dir) |
+| `debounceMs` | number | `3000` | Minimum milliseconds between notifications (prevents rapid-fire) |
 
 ### notifyOn levels (inclusive)
 
