@@ -78,8 +78,14 @@ if (-not [Console]::IsInputRedirected) {
     } catch {}
 }
 
-# Log the full event type for analysis
-Write-DebugLog ("payload: " + $stdinContent.Trim())
+# Log the full event type for analysis (always logged, not gated by debug)
+if (-not [string]::IsNullOrWhiteSpace($logFile) -and -not [string]::IsNullOrWhiteSpace($stdinContent.Trim())) {
+    $dir = Split-Path -Parent $logFile
+    if (-not [string]::IsNullOrWhiteSpace($dir) -and -not (Test-Path -LiteralPath $dir)) {
+        New-Item -ItemType Directory -Path $dir -Force -ErrorAction SilentlyContinue | Out-Null
+    }
+    Add-Content -LiteralPath $logFile -Value ("[" + (Get-Date -Format o) + "] payload: " + $stdinContent.Trim()) -ErrorAction SilentlyContinue
+}
 
 if ($hookEventName -ne '' -and $notifyOnSet -notcontains $hookEventName.ToLowerInvariant()) {
     Write-DebugLog ("event '" + $hookEventName + "' not in notifyOn=[" + ($notifyOnSet -join ',') + "], skipping")

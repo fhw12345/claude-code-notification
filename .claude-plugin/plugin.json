@@ -1,6 +1,6 @@
 {
   "name": "cc-plugin-notification",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Windows taskbar flash notifications for Claude Code — alerts you when tasks complete, fail, or need input",
   "author": {
     "name": "Haowen Feng"
