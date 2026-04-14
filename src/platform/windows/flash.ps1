@@ -5,11 +5,20 @@ $workspaceName = $env:CC_NOTIFY_WORKSPACE_NAME
 if ([string]::IsNullOrWhiteSpace($workspaceName)) {
     $workspaceName = Split-Path -Leaf (Get-Location)
 }
+
+# --- Log setup ---
 $logFile = $env:CC_NOTIFY_LOG_FILE
+if ([string]::IsNullOrWhiteSpace($logFile) -and -not [string]::IsNullOrWhiteSpace($env:CLAUDE_PLUGIN_DATA)) {
+    $logFile = Join-Path $env:CLAUDE_PLUGIN_DATA 'notification.log'
+}
 
 function Write-DebugLog($msg) {
     if ($debugEnabled) { Write-Output $msg }
     if (-not [string]::IsNullOrWhiteSpace($logFile)) {
+        $dir = Split-Path -Parent $logFile
+        if (-not [string]::IsNullOrWhiteSpace($dir) -and -not (Test-Path -LiteralPath $dir)) {
+            New-Item -ItemType Directory -Path $dir -Force -ErrorAction SilentlyContinue | Out-Null
+        }
         Add-Content -LiteralPath $logFile -Value ("[" + (Get-Date -Format o) + "] " + $msg) -ErrorAction SilentlyContinue
     }
 }
@@ -44,7 +53,7 @@ $targetPidText = $env:CC_NOTIFY_TARGET_PID
 
 # --- Walk the process chain from this script's PID ---
 $startPid = $PID
-Write-DebugLog ("startPid=" + $startPid)
+Write-DebugLog ("startPid=" + $startPid + " workspace=" + $workspaceName)
 
 $visited = New-Object 'System.Collections.Generic.HashSet[int]'
 $pidToInspect = $startPid
@@ -88,7 +97,6 @@ $callback = [Win32Flash+EnumWindowsProc]{
     return $true
 }
 [Win32Flash]::EnumWindows($callback, [IntPtr]::Zero) | Out-Null
-Write-DebugLog ("windowsByPid keys: " + (($script:windowsByPid.Keys | Sort-Object) -join ','))
 
 # --- Select target window ---
 $selectedPid = 0
@@ -113,7 +121,6 @@ if ($hwnd -eq [IntPtr]::Zero) {
         if ($skipNames -contains $proc.Name.ToLowerInvariant()) { continue }
         if (-not $script:windowsByPid.ContainsKey($proc.ProcessId) -or $script:windowsByPid[$proc.ProcessId].Count -eq 0) { continue }
         $handles = $script:windowsByPid[$proc.ProcessId]
-        # Sort: workspace match first, then by title
         $windowEntries = foreach ($handle in $handles) {
             $title = [string]$script:windowTitlesByHandle[$handle.ToString()]
             [pscustomobject]@{
@@ -133,10 +140,16 @@ if ($hwnd -eq [IntPtr]::Zero) {
 
 Write-DebugLog ("selected: PID=" + $selectedPid + " hwnd=" + $hwnd + " title=" + $selectedTitle)
 
-if ($hwnd -eq [IntPtr]::Zero) { exit 2 }
-if ($dryRun) { exit 0 }
+if ($hwnd -eq [IntPtr]::Zero) {
+    Write-DebugLog "FAILED: no window found"
+    exit 2
+}
+if ($dryRun) {
+    Write-DebugLog "DRY_RUN: skipping flash and sound"
+    exit 0
+}
 
-# --- Flash! ---
+# --- Flash ---
 $fw = New-Object FLASHWINFO
 $fw.cbSize = [System.Runtime.InteropServices.Marshal]::SizeOf($fw)
 $fw.hwnd = $hwnd
@@ -144,4 +157,24 @@ $fw.dwFlags = 14
 $fw.uCount = 0
 $fw.dwTimeout = 0
 [void][Win32Flash]::FlashWindowEx([ref]$fw)
+Write-DebugLog ("flashed hwnd=" + $hwnd)
 Write-Output ('hwnd=' + $hwnd)
+
+# --- Sound ---
+$soundOff = $env:CC_NOTIFY_SOUND -ieq 'off'
+if (-not $soundOff) {
+    $customSound = $env:CC_NOTIFY_SOUND_FILE
+    if (-not [string]::IsNullOrWhiteSpace($customSound) -and (Test-Path -LiteralPath $customSound)) {
+        try {
+            $player = New-Object System.Media.SoundPlayer($customSound)
+            $player.Play()
+            Write-DebugLog ("sound: custom file=" + $customSound)
+        } catch {
+            Write-DebugLog ("sound: custom file failed, falling back to system sound")
+            [System.Media.SystemSounds]::Asterisk.Play()
+        }
+    } else {
+        [System.Media.SystemSounds]::Asterisk.Play()
+        Write-DebugLog "sound: system asterisk"
+    }
+}
