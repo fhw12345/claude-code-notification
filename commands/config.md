@@ -24,7 +24,9 @@ The config file is at `$CLAUDE_PLUGIN_DATA/config.json` (environment variable `C
   "soundFile": "",
   "debug": false,
   "logFile": "",
-  "notifyOn": "normal"
+  "notifyOn": "normal",
+  "quietHours": "",
+  "notifyWhenFocused": false
 }
 ```
 
@@ -36,6 +38,8 @@ The config file is at `$CLAUDE_PLUGIN_DATA/config.json` (environment variable `C
 | `notifyOn` | string | `"normal"` | Notification level or custom event list |
 | `sound` | `"on"` / `"off"` | `"on"` | Play sound when notifying |
 | `soundFile` | string | `""` | Path to custom .wav file (empty = system sound) |
+| `quietHours` | string | `""` | Suppress during time range, e.g. `"22:00-08:00"` (local time). Empty = no quiet hours |
+| `notifyWhenFocused` | bool | `false` | Notify even when the host window is in foreground |
 | `debug` | bool | `false` | Enable debug logging |
 | `logFile` | string | `""` | Custom log file path (empty = plugin data dir) |
 

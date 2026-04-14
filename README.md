@@ -36,6 +36,8 @@ In a Claude Code session:
 /cc-plugin-notification:config sound=off             # disable sound
 /cc-plugin-notification:config soundFile=C:\path\to\alert.wav  # custom sound
 /cc-plugin-notification:config enabled=false         # disable all notifications
+/cc-plugin-notification:config quietHours=22:00-08:00 # no notifications 10pm-8am
+/cc-plugin-notification:config notifyWhenFocused=true # notify even when window is active
 /cc-plugin-notification:config debug=true            # enable debug logging
 /cc-plugin-notification:config reset                 # reset to defaults
 ```
@@ -81,7 +83,9 @@ The config file is stored at `~/.claude/plugins/data/cc-plugin-notification-.../
   "soundFile": "",
   "debug": false,
   "logFile": "",
-  "notifyOn": "normal"
+  "notifyOn": "normal",
+  "quietHours": "",
+  "notifyWhenFocused": false
 }
 ```
 
@@ -93,6 +97,8 @@ The config file is stored at `~/.claude/plugins/data/cc-plugin-notification-.../
 | `notifyOn` | string | `"normal"` | Notification level: `all`, `normal`, `important`, or custom comma-separated events |
 | `sound` | `"on"` / `"off"` | `"on"` | Play sound when notifying |
 | `soundFile` | string | `""` | Path to custom .wav file (empty = system sound) |
+| `quietHours` | string | `""` | Suppress notifications during time range, e.g. `"22:00-08:00"` (local time) |
+| `notifyWhenFocused` | bool | `false` | Notify even when the host window is in foreground |
 | `debug` | bool | `false` | Enable debug logging |
 | `logFile` | string | `""` | Custom log file path (empty = default in plugin data dir) |
 
@@ -106,6 +112,8 @@ Environment variables take precedence over the config file:
 | `CC_NOTIFY_ON` | `notifyOn` | level name or comma-separated events |
 | `CC_NOTIFY_SOUND` | `sound` | `on` / `off` |
 | `CC_NOTIFY_SOUND_FILE` | `soundFile` | file path |
+| `CC_NOTIFY_QUIET_HOURS` | `quietHours` | `HH:MM-HH:MM` or empty |
+| `CC_NOTIFY_WHEN_FOCUSED` | `notifyWhenFocused` | `true` / `false` |
 | `CC_NOTIFY_DEBUG` | `debug` | `1` / `0` |
 | `CC_NOTIFY_LOG_FILE` | `logFile` | file path |
 | `CC_NOTIFY_TARGET_PID` | — | Override target window PID |

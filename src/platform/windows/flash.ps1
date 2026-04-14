@@ -25,6 +25,8 @@ $soundEnabled = (Get-Setting 'sound'     'CC_NOTIFY_SOUND'      'on') -ine 'off'
 $soundFile    =  Get-Setting 'soundFile' 'CC_NOTIFY_SOUND_FILE' ''
 $logFileCfg   =  Get-Setting 'logFile'   'CC_NOTIFY_LOG_FILE'   ''
 $notifyOn     =  Get-Setting 'notifyOn'  'CC_NOTIFY_ON'         'normal'
+$quietHours   =  Get-Setting 'quietHours' 'CC_NOTIFY_QUIET_HOURS' ''
+$notifyWhenFocused = (Get-Setting 'notifyWhenFocused' 'CC_NOTIFY_WHEN_FOCUSED' 'false') -ieq 'true' -or (Get-Setting 'notifyWhenFocused' 'CC_NOTIFY_WHEN_FOCUSED' 'false') -ieq '1'
 
 # Resolve notifyOn level to event list
 $levelMap = @{
@@ -66,6 +68,21 @@ function Write-DebugLog($msg) {
 if (-not $enabled) {
     Write-DebugLog "notification disabled by config"
     exit 0
+}
+
+# --- Check quiet hours (format: "HH:MM-HH:MM", local time) ---
+if (-not [string]::IsNullOrWhiteSpace($quietHours)) {
+    $qhMatch = [regex]::Match($quietHours, '^(\d{2}):(\d{2})-(\d{2}):(\d{2})$')
+    if ($qhMatch.Success) {
+        $qhStart = [int]$qhMatch.Groups[1].Value * 60 + [int]$qhMatch.Groups[2].Value
+        $qhEnd   = [int]$qhMatch.Groups[3].Value * 60 + [int]$qhMatch.Groups[4].Value
+        $nowMinutes = (Get-Date).Hour * 60 + (Get-Date).Minute
+        $inQuiet = if ($qhStart -lt $qhEnd) { $nowMinutes -ge $qhStart -and $nowMinutes -lt $qhEnd } else { $nowMinutes -ge $qhStart -or $nowMinutes -lt $qhEnd }
+        if ($inQuiet) {
+            Write-DebugLog ("quiet hours active (" + $quietHours + "), skipping")
+            exit 0
+        }
+    }
 }
 
 # --- Check event type filter ---
@@ -126,6 +143,7 @@ public static class Win32Flash {
     [DllImport("user32.dll")] public static extern IntPtr GetWindow(IntPtr hWnd, UInt32 uCmd);
     [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
     [DllImport("user32.dll")] public static extern UInt32 GetWindowThreadProcessId(IntPtr hWnd, out UInt32 processId);
+    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
 }
 '@
 
@@ -227,6 +245,15 @@ if ($hwnd -eq [IntPtr]::Zero) {
 if ($dryRun) {
     Write-DebugLog "DRY_RUN: skipping flash and sound"
     exit 0
+}
+
+# --- Focus check ---
+if (-not $notifyWhenFocused) {
+    $fgWnd = [Win32Flash]::GetForegroundWindow()
+    if ($fgWnd -eq $hwnd) {
+        Write-DebugLog "window is focused, skipping (set notifyWhenFocused=true to override)"
+        exit 0
+    }
 }
 
 # --- Flash ---
