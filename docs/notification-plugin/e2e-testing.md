@@ -1,107 +1,60 @@
 # E2E Testing Guide
 
-## Quick E2E Test
-
-Tests the full pipeline (stdin payload → normalize → rules → flash) without manual interaction:
+## Automated Tests
 
 ```bash
-# From repo root
-claude -p "say hi" --output-format stream-json --include-hook-events --verbose 2>/dev/null | grep -E "Stop|Notification"
+npm test
 ```
 
-Expected: `hook_started` and `hook_response` events with `hook_event="Stop"` and `exit_code=0`.
+Runs 14 E2E tests that invoke the real PowerShell script (`flash.ps1`). Tests cover:
+- enabled/disabled
+- quiet hours (active/inactive)
+- notifyWhenFocused
+- notifyOn levels (all/normal/important/custom)
+- sound on/off
+- dry run mode
+- payload logging
 
-## Detailed Test Steps
+## Manual Testing
 
-### 1. Test payload parsing (Stop hook)
+### Test flash directly
 
 ```bash
-echo '{"hook_event_name":"Stop","stop_hook_active":false,"last_assistant_message":"Hello!"}' | \
-  CC_NOTIFY_DEBUG=1 CC_PLUGIN_E2E_OUTPUT=1 \
-  node ./node_modules/tsx/dist/cli.mjs ./src/cli.ts \
-  --notify-enabled=true --notify-channel-taskbar-flash=true --notify-behavior-quiet-hours=off
+CC_NOTIFY_DEBUG=1 powershell -NoProfile -ExecutionPolicy Bypass -File src/platform/windows/flash.ps1
 ```
 
-Expected: `candidatePids=XXXX`, `resolvedHwnd=XXXX`, `{"delivered":true,...}`.
-
-### 2. Test payload parsing (Notification hook)
+### Test with specific hook payload
 
 ```bash
-echo '{"hook_event_name":"Notification","notification_type":"idle_prompt","message":"Claude is waiting"}' | \
-  CC_PLUGIN_E2E_OUTPUT=1 \
-  node ./node_modules/tsx/dist/cli.mjs ./src/cli.ts \
-  --notify-enabled=true --notify-channel-taskbar-flash=true --notify-behavior-quiet-hours=off
-```
-
-### 3. Test with explicit target PID
-
-Bypasses process chain detection — useful for isolating flash logic:
-
-```bash
-# Find WindowsTerminal PID
-powershell -Command "Get-Process WindowsTerminal | Select Id"
-
-# Or find VS Code PID
-powershell -Command "Get-Process Code | Where-Object { $_.MainWindowHandle -ne 0 } | Select Id"
-
-# Flash it
 echo '{"hook_event_name":"Stop","last_assistant_message":"test"}' | \
-  CC_NOTIFY_DEBUG=1 CC_PLUGIN_E2E_OUTPUT=1 CC_NOTIFY_TARGET_PID=<PID> \
-  node ./node_modules/tsx/dist/cli.mjs ./src/cli.ts \
-  --notify-enabled=true --notify-channel-taskbar-flash=true --notify-behavior-quiet-hours=off
+  CC_NOTIFY_DEBUG=1 CC_NOTIFY_WHEN_FOCUSED=true \
+  powershell -NoProfile -ExecutionPolicy Bypass -File src/platform/windows/flash.ps1
 ```
 
-### 4. Debug process chain
-
-When `candidatePids` is empty, trace the process chain:
+### Test via Claude Code
 
 ```bash
-npm run demo:notify:debug
-```
-
-Or create `debug-chain.ps1`:
-
-```powershell
-$currentPid = $PID
-$visited = @{}
-while ($currentPid -gt 0 -and -not $visited.ContainsKey($currentPid)) {
-    $visited[$currentPid] = $true
-    $proc = Get-CimInstance Win32_Process -Filter ('ProcessId = ' + $currentPid) -ErrorAction SilentlyContinue
-    if (-not $proc) { break }
-    Write-Output ('PID=' + $proc.ProcessId + ' PPID=' + $proc.ParentProcessId + ' Name=' + $proc.Name)
-    if ($proc.ParentProcessId -eq $currentPid) { break }
-    $currentPid = [int]$proc.ParentProcessId
-}
+claude -p "say hi" --output-format stream-json --include-hook-events --verbose 2>/dev/null | grep Stop
 ```
 
 ## Environment Variables
 
 | Variable | Purpose |
 |----------|---------|
-| `CC_NOTIFY_DEBUG=1` | PowerShell debug output (candidatePids, hwnd, etc.) |
-| `CC_PLUGIN_E2E_OUTPUT=1` | Emit JSON result on stdout |
-| `CC_NOTIFY_TARGET_PID=<pid>` | Skip process chain, flash this PID's window |
-| `CC_NOTIFY_DRY_RUN=1` | Find window but don't flash |
-| `VSCODE_PID` | Auto-set by VS Code for window detection |
+| `CC_NOTIFY_DEBUG=1` | Debug output to stdout + log |
+| `CC_NOTIFY_DRY_RUN=1` | Find window without flashing |
+| `CC_NOTIFY_TARGET_PID=<pid>` | Override target window PID |
+| `CC_NOTIFY_WHEN_FOCUSED=true` | Notify even when window is active |
+| `CC_NOTIFY_ON=important` | Filter by notification level |
+| `CC_NOTIFY_SOUND=off` | Disable sound |
+| `CC_NOTIFY_QUIET_HOURS=22:00-08:00` | Quiet hours (local time) |
 
 ## Plugin Update Cycle
 
 ```bash
-# 1. Make code changes
-# 2. Bump version in BOTH files:
-#    .claude-plugin/plugin.json
-#    .claude-plugin/marketplace.json
-# 3. Commit and push
-git add -A && git commit -m "..." && git push
-# 4. Update plugin
-claude plugins update cc-plugin-notification@cc-notification-marketplace
-# 5. Restart CC (required for hooks.json changes, not for .ts code changes)
+# 1. Edit code
+# 2. Bump version in .claude-plugin/plugin.json AND .claude-plugin/marketplace.json
+# 3. git commit && git push
+# 4. claude plugins update cc-plugin-notification@cc-notification-marketplace
+# 5. Restart cc (for hooks.json changes; .ps1 changes take effect immediately)
 ```
-
-## Key Gotchas
-
-- **Notification hook ≠ every response.** Only fires after 60s idle. Use **Stop hook** for per-response notifications.
-- **Hook processes have isolated process chains.** WindowsTerminal.exe / Code.exe may not be in the parent chain. The fallback searches by process name.
-- **`-EncodedCommand` has a length limit.** Uses temp file + `-File` instead.
-- **Plugin cache is version-pinned.** Must bump version for `claude plugins update` to re-fetch.
-- **hooks.json needs CC restart.** Source .ts files are re-compiled per invocation.

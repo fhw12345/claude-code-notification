@@ -1,8 +1,0 @@
-{
-  "events": {
-    "taskFailed": true
-  },
-  "channels": {
-    "toast": false
-  }
-}

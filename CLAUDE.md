@@ -1,48 +1,39 @@
-﻿# CLAUDE.md
+# CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Common commands
 
-- Run tests:
-  - `npm test`
-  - Single test file: `npx vitest run tests/unit/platform/windows-notifier.test.ts`
-- Demo (runs CLI with sample payload):
-  - `npm run demo:notify:ok`
-  - `npm run demo:notify:badjson`
-  - `npm run demo:notify:debug` (with debug output)
-  - `npm run demo:notify:inspect` (inspect notification target)
-- No build step — CLI runs directly from `.ts` via `tsx`.
+- Run tests: `npm test`
+- Single test: `npx vitest run tests/e2e/flash-ps1.test.ts`
+- Manual test: `CC_NOTIFY_DEBUG=1 powershell -NoProfile -ExecutionPolicy Bypass -File src/platform/windows/flash.ps1`
 
 ## Architecture overview
 
-- **Entry points**
-  - CLI: `src/cli.ts` (bin: `cc-plugin-notification`). Reads JSON payload from stdin, resolves config, runs pipeline. Set `CC_PLUGIN_E2E_OUTPUT=1` to emit JSON result on stdout (used by integration tests).
-  - Library: `src/index.ts` exports `createNotificationPipeline`.
+This is a Claude Code plugin that flashes the Windows taskbar and plays a sound when Claude responds.
 
-- **Runtime pipeline** (`src/runtime/*`)
-  - `createPipeline.ts` builds state (throttle, focus detector) and routes events.
-  - `handleEvent.ts` flow: normalize hook payload -> evaluate rules -> call adapter notify -> return `{ delivered, reason }`.
+- **Entry point**: `hooks/hooks.json` registers CC hooks (Stop, Notification, SubagentStop, etc.) that invoke `src/platform/windows/flash.ps1` directly via PowerShell.
+- **Core logic**: `src/platform/windows/flash.ps1` — standalone PowerShell script that:
+  1. Loads config from `$CLAUDE_PLUGIN_DATA/config.json` with env var overrides
+  2. Checks enabled, quiet hours, event type filters (`notifyOn` levels)
+  3. Walks the process chain from `$PID` up to find the outermost host window
+  4. Calls `FlashWindowEx` on the host window
+  5. Plays notification sound (system or custom wav)
+  6. Logs payload and debug info to `notification.log`
+- **Config command**: `commands/config.md` — `/cc-plugin-notification:config` slash command for managing settings
+- **Tests**: `tests/e2e/flash-ps1.test.ts` — 14 E2E tests that invoke the real PowerShell script
 
-- **Event normalization** (`src/events/*`)
-  - `normalizeHookEvent.ts` maps hook payloads to `AgentEvent` (`task_completed`, `task_failed`, `needs_input`, `progress_update`).
+## Key config settings
 
-- **Config resolution** (`src/config/*`)
-  - Defaults in `defaults.ts`.
-  - CLI overrides parsed in `parseCliArgs.ts` (limited set of flags).
-  - Merge in `mergeConfig.ts` and `resolveConfig.ts`; precedence: defaults -> settings -> plugin -> CLI.
-  - Note: loaders `loadSettingsJson.ts` / `loadPluginConfig.ts` exist but are not wired through the CLI path.
+- `notifyOn`: `all` / `normal` (default) / `important` / custom comma-separated events
+- `sound`: `on` / `off`
+- `quietHours`: `"HH:MM-HH:MM"` (local time)
+- `notifyWhenFocused`: `true` / `false`
 
-- **Rules engine** (`src/rules/*`)
-  - `evaluateRules.ts` enforces enabled flags, focus policy, quiet hours, and throttle.
-  - Quiet hours are evaluated using UTC time (`getUTCHours/getUTCMinutes`).
+## Plugin update cycle
 
-- **Windows notifications** (`src/platform/windows/*`)
-  - `windowsNotifier.ts` uses taskbar flash only. No toast fallback.
-  - `taskbarFlash.ts` uses PowerShell + `FlashWindowEx`. Targets a PID via `CC_NOTIFY_TARGET_PID` to flash the Claude Code host window (VS Code window for integrated terminal, terminal window for terminal hosts).
-
-## Docs
-
-- Config and CLI flags: `docs/notification-plugin/configuration.md`
-- Manual Windows acceptance checklist: `docs/notification-plugin/manual-windows-acceptance.md`
-- Design/plan docs: `docs/superpowers/specs/*` and `docs/superpowers/plans/*`
+1. Edit code
+2. Bump version in `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`
+3. `git commit && git push`
+4. `claude plugins update cc-plugin-notification@cc-notification-marketplace`
+5. Restart cc (required for hooks.json changes, not for .ps1 code changes)

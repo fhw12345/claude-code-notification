@@ -19,14 +19,17 @@ function Get-Setting($configKey, $envVar, $default) {
 }
 
 $enabled      = (Get-Setting 'enabled'   'CC_NOTIFY_ENABLED'    'true') -ine 'false'
-$debugEnabled = (Get-Setting 'debug'     'CC_NOTIFY_DEBUG'      'false') -ieq '1' -or (Get-Setting 'debug' 'CC_NOTIFY_DEBUG' 'false') -ieq 'true'
-$dryRun       = (Get-Setting 'dryRun'    'CC_NOTIFY_DRY_RUN'    'false') -ieq '1' -or (Get-Setting 'dryRun' 'CC_NOTIFY_DRY_RUN' 'false') -ieq 'true'
+$debugVal     =  Get-Setting 'debug'     'CC_NOTIFY_DEBUG'      'false'
+$debugEnabled = $debugVal -ieq '1' -or $debugVal -ieq 'true'
+$dryRunVal    =  Get-Setting 'dryRun'    'CC_NOTIFY_DRY_RUN'    'false'
+$dryRun       = $dryRunVal -ieq '1' -or $dryRunVal -ieq 'true'
 $soundEnabled = (Get-Setting 'sound'     'CC_NOTIFY_SOUND'      'on') -ine 'off'
 $soundFile    =  Get-Setting 'soundFile' 'CC_NOTIFY_SOUND_FILE' ''
 $logFileCfg   =  Get-Setting 'logFile'   'CC_NOTIFY_LOG_FILE'   ''
 $notifyOn     =  Get-Setting 'notifyOn'  'CC_NOTIFY_ON'         'normal'
 $quietHours   =  Get-Setting 'quietHours' 'CC_NOTIFY_QUIET_HOURS' ''
-$notifyWhenFocused = (Get-Setting 'notifyWhenFocused' 'CC_NOTIFY_WHEN_FOCUSED' 'false') -ieq 'true' -or (Get-Setting 'notifyWhenFocused' 'CC_NOTIFY_WHEN_FOCUSED' 'false') -ieq '1'
+$notifyWhenFocusedVal = Get-Setting 'notifyWhenFocused' 'CC_NOTIFY_WHEN_FOCUSED' 'false'
+$notifyWhenFocused = $notifyWhenFocusedVal -ieq 'true' -or $notifyWhenFocusedVal -ieq '1'
 
 # Resolve notifyOn level to event list
 $levelMap = @{
