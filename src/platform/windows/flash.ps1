@@ -1,13 +1,46 @@
 $ProgressPreference = 'SilentlyContinue'
-$debugEnabled = $env:CC_NOTIFY_DEBUG -eq '1'
-$dryRun = $env:CC_NOTIFY_DRY_RUN -eq '1'
+
+# --- Load config from $CLAUDE_PLUGIN_DATA/config.json ---
+$config = @{}
+if (-not [string]::IsNullOrWhiteSpace($env:CLAUDE_PLUGIN_DATA)) {
+    $configPath = Join-Path $env:CLAUDE_PLUGIN_DATA 'config.json'
+    if (Test-Path -LiteralPath $configPath) {
+        try { $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json } catch { $config = @{} }
+    }
+}
+
+# Helper: config value with env var override
+function Get-Setting($configKey, $envVar, $default) {
+    $envVal = [System.Environment]::GetEnvironmentVariable($envVar)
+    if (-not [string]::IsNullOrWhiteSpace($envVal)) { return $envVal }
+    $val = $config.PSObject.Properties[$configKey].Value 2>$null
+    if ($null -ne $val) { return [string]$val }
+    return $default
+}
+
+$enabled      = (Get-Setting 'enabled'   'CC_NOTIFY_ENABLED'    'true') -ine 'false'
+$debugEnabled = (Get-Setting 'debug'     'CC_NOTIFY_DEBUG'      'false') -ieq '1' -or (Get-Setting 'debug' 'CC_NOTIFY_DEBUG' 'false') -ieq 'true'
+$dryRun       = (Get-Setting 'dryRun'    'CC_NOTIFY_DRY_RUN'    'false') -ieq '1' -or (Get-Setting 'dryRun' 'CC_NOTIFY_DRY_RUN' 'false') -ieq 'true'
+$soundEnabled = (Get-Setting 'sound'     'CC_NOTIFY_SOUND'      'on') -ine 'off'
+$soundFile    =  Get-Setting 'soundFile' 'CC_NOTIFY_SOUND_FILE' ''
+$logFileCfg   =  Get-Setting 'logFile'   'CC_NOTIFY_LOG_FILE'   ''
+
+# Events config (nested object)
+$eventsStop         = $true
+$eventsNotification = $true
+if ($config.PSObject.Properties['events'] 2>$null) {
+    $ev = $config.events
+    if ($null -ne $ev.PSObject.Properties['stop'] 2>$null)         { $eventsStop         = [string]$ev.stop -ine 'false' }
+    if ($null -ne $ev.PSObject.Properties['notification'] 2>$null) { $eventsNotification = [string]$ev.notification -ine 'false' }
+}
+
 $workspaceName = $env:CC_NOTIFY_WORKSPACE_NAME
 if ([string]::IsNullOrWhiteSpace($workspaceName)) {
     $workspaceName = Split-Path -Leaf (Get-Location)
 }
 
 # --- Log setup ---
-$logFile = $env:CC_NOTIFY_LOG_FILE
+$logFile = $logFileCfg
 if ([string]::IsNullOrWhiteSpace($logFile) -and -not [string]::IsNullOrWhiteSpace($env:CLAUDE_PLUGIN_DATA)) {
     $logFile = Join-Path $env:CLAUDE_PLUGIN_DATA 'notification.log'
 }
@@ -21,6 +54,37 @@ function Write-DebugLog($msg) {
         }
         Add-Content -LiteralPath $logFile -Value ("[" + (Get-Date -Format o) + "] " + $msg) -ErrorAction SilentlyContinue
     }
+}
+
+# --- Check if enabled ---
+if (-not $enabled) {
+    Write-DebugLog "notification disabled by config"
+    exit 0
+}
+
+# --- Check event type filter ---
+# Hook payload comes via stdin as JSON; peek at hook_event_name to filter
+$hookEventName = ''
+$stdinContent = ''
+if (-not [Console]::IsInputRedirected) {
+    # no stdin — likely direct invocation, allow
+} else {
+    try {
+        $stdinContent = [Console]::In.ReadToEnd()
+        if (-not [string]::IsNullOrWhiteSpace($stdinContent)) {
+            $payload = $stdinContent | ConvertFrom-Json -ErrorAction SilentlyContinue
+            if ($payload) { $hookEventName = [string]$payload.hook_event_name }
+        }
+    } catch {}
+}
+
+if ($hookEventName -eq 'Stop' -and -not $eventsStop) {
+    Write-DebugLog "event 'Stop' disabled by config"
+    exit 0
+}
+if ($hookEventName -eq 'Notification' -and -not $eventsNotification) {
+    Write-DebugLog "event 'Notification' disabled by config"
+    exit 0
 }
 
 # --- Win32 API ---
@@ -53,7 +117,7 @@ $targetPidText = $env:CC_NOTIFY_TARGET_PID
 
 # --- Walk the process chain from this script's PID ---
 $startPid = $PID
-Write-DebugLog ("startPid=" + $startPid + " workspace=" + $workspaceName)
+Write-DebugLog ("startPid=" + $startPid + " workspace=" + $workspaceName + " hookEvent=" + $hookEventName)
 
 $visited = New-Object 'System.Collections.Generic.HashSet[int]'
 $pidToInspect = $startPid
@@ -130,7 +194,6 @@ if ($hwnd -eq [IntPtr]::Zero) {
             }
         }
         $best = $windowEntries | Sort-Object WorkspaceRank, Title | Select-Object -First 1
-        # Overwrite — later (outermost) wins
         $selectedPid = $proc.ProcessId
         $hwnd = $best.Handle
         $selectedTitle = $best.Title
@@ -161,14 +224,12 @@ Write-DebugLog ("flashed hwnd=" + $hwnd)
 Write-Output ('hwnd=' + $hwnd)
 
 # --- Sound ---
-$soundOff = $env:CC_NOTIFY_SOUND -ieq 'off'
-if (-not $soundOff) {
-    $customSound = $env:CC_NOTIFY_SOUND_FILE
-    if (-not [string]::IsNullOrWhiteSpace($customSound) -and (Test-Path -LiteralPath $customSound)) {
+if ($soundEnabled) {
+    if (-not [string]::IsNullOrWhiteSpace($soundFile) -and (Test-Path -LiteralPath $soundFile)) {
         try {
-            $player = New-Object System.Media.SoundPlayer($customSound)
+            $player = New-Object System.Media.SoundPlayer($soundFile)
             $player.Play()
-            Write-DebugLog ("sound: custom file=" + $customSound)
+            Write-DebugLog ("sound: custom file=" + $soundFile)
         } catch {
             Write-DebugLog ("sound: custom file failed, falling back to system sound")
             [System.Media.SystemSounds]::Asterisk.Play()
