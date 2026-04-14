@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx --prefix ${CLAUDE_PLUGIN_ROOT} tsx ${CLAUDE_PLUGIN_ROOT}/src/cli.ts --notify-enabled=true --notify-channel-taskbar-flash=true --notify-behavior-quiet-hours=off",
+            "command": "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ${CLAUDE_PLUGIN_ROOT}/src/platform/windows/flash.ps1",
             "timeout": 30
           }
         ]
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx --prefix ${CLAUDE_PLUGIN_ROOT} tsx ${CLAUDE_PLUGIN_ROOT}/src/cli.ts --notify-enabled=true --notify-channel-taskbar-flash=true --notify-behavior-quiet-hours=off",
+            "command": "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ${CLAUDE_PLUGIN_ROOT}/src/platform/windows/flash.ps1",
             "timeout": 30
           }
         ]
