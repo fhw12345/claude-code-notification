@@ -30,14 +30,44 @@ The flash continues until you switch back to the window, then auto-clears.
 In a Claude Code session:
 
 ```
-/cc-plugin-notification:config                    # show current settings
-/cc-plugin-notification:config sound=off          # disable sound
-/cc-plugin-notification:config sound=on           # enable sound
+/cc-plugin-notification:config                       # show current settings
+/cc-plugin-notification:config notifyOn=important    # only notify when user action needed
+/cc-plugin-notification:config notifyOn=all          # notify on everything
+/cc-plugin-notification:config sound=off             # disable sound
 /cc-plugin-notification:config soundFile=C:\path\to\alert.wav  # custom sound
-/cc-plugin-notification:config enabled=false      # disable all notifications
-/cc-plugin-notification:config events.stop=false  # disable per-response notifications
-/cc-plugin-notification:config debug=true         # enable debug logging
-/cc-plugin-notification:config reset              # reset to defaults
+/cc-plugin-notification:config enabled=false         # disable all notifications
+/cc-plugin-notification:config debug=true            # enable debug logging
+/cc-plugin-notification:config reset                 # reset to defaults
+```
+
+### Notification levels (`notifyOn`)
+
+Controls which events trigger a notification. Use a preset level or a custom comma-separated list.
+
+| Level | Events included | Use case |
+|-------|----------------|----------|
+| `all` | Stop, Notification, SubagentStop, SubagentStart, TeammateIdle, SessionStart, SessionEnd, StopFailure | Every CC event notifies (frequent) |
+| **`normal`** (default) | Stop, Notification, SubagentStop | Response done + needs input + subagent done |
+| `important` | Notification | Only when user action is needed (quiet) |
+
+**Event details:**
+
+| Event | Meaning |
+|-------|---------|
+| `Stop` | Claude finished responding |
+| `Notification/permission_prompt` | Claude needs permission to use a tool |
+| `Notification/idle_prompt` | Claude is waiting for your input (after 60s idle) |
+| `SubagentStop` | A subagent (spawned via Agent tool) completed |
+| `SubagentStart` | A subagent was spawned |
+| `TeammateIdle` | A teammate in an agent team went idle |
+| `SessionStart` | A new CC session started |
+| `SessionEnd` | A CC session ended |
+| `StopFailure` | Claude's response failed |
+
+**Custom list example:**
+
+```
+/cc-plugin-notification:config notifyOn=Stop,Notification,SubagentStop,TeammateIdle
 ```
 
 ### Config file
@@ -51,10 +81,7 @@ The config file is stored at `~/.claude/plugins/data/cc-plugin-notification-.../
   "soundFile": "",
   "debug": false,
   "logFile": "",
-  "events": {
-    "stop": true,
-    "notification": true
-  }
+  "notifyOn": "normal"
 }
 ```
 
@@ -63,12 +90,11 @@ The config file is stored at `~/.claude/plugins/data/cc-plugin-notification-.../
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `enabled` | bool | `true` | Master switch for all notifications |
+| `notifyOn` | string | `"normal"` | Notification level: `all`, `normal`, `important`, or custom comma-separated events |
 | `sound` | `"on"` / `"off"` | `"on"` | Play sound when notifying |
 | `soundFile` | string | `""` | Path to custom .wav file (empty = system sound) |
 | `debug` | bool | `false` | Enable debug logging |
 | `logFile` | string | `""` | Custom log file path (empty = default in plugin data dir) |
-| `events.stop` | bool | `true` | Notify when Claude finishes responding |
-| `events.notification` | bool | `true` | Notify on CC idle/permission events |
 
 ### Environment variable overrides
 
@@ -77,6 +103,7 @@ Environment variables take precedence over the config file:
 | Variable | Overrides | Values |
 |----------|-----------|--------|
 | `CC_NOTIFY_ENABLED` | `enabled` | `true` / `false` |
+| `CC_NOTIFY_ON` | `notifyOn` | level name or comma-separated events |
 | `CC_NOTIFY_SOUND` | `sound` | `on` / `off` |
 | `CC_NOTIFY_SOUND_FILE` | `soundFile` | file path |
 | `CC_NOTIFY_DEBUG` | `debug` | `1` / `0` |
@@ -86,16 +113,17 @@ Environment variables take precedence over the config file:
 
 ## How it works
 
-The plugin registers a **Stop hook** that runs after every Claude response. It:
+The plugin registers hooks for all CC event types. On each event:
 
-1. Walks the process tree from the hook's PowerShell process up to the root
-2. Finds the outermost ancestor with a visible taskbar window (WindowsTerminal.exe, Code.exe, etc.)
-3. Calls `FlashWindowEx` on that window
-4. Plays a notification sound
+1. Checks if the event matches the `notifyOn` level
+2. Walks the process tree from the hook process up to the root
+3. Finds the outermost ancestor with a visible taskbar window (WindowsTerminal.exe, Code.exe, etc.)
+4. Calls `FlashWindowEx` on that window
+5. Plays a notification sound
 
 ## Logs
 
-Logs are written to `~/.claude/plugins/data/cc-plugin-notification-.../notification.log`. Enable debug mode for verbose output:
+All hook payloads are logged to `~/.claude/plugins/data/cc-plugin-notification-.../notification.log`. Enable debug mode for verbose process chain output:
 
 ```
 /cc-plugin-notification:config debug=true
@@ -103,6 +131,7 @@ Logs are written to `~/.claude/plugins/data/cc-plugin-notification-.../notificat
 
 ## Troubleshooting
 
+- **Too many notifications**: Set `notifyOn=important` to only notify when user action is needed
 - **Wrong window flashes**: Set `CC_NOTIFY_TARGET_PID` to the correct process ID
 - **Nothing flashes**: Enable debug logging and check `notification.log`
 - **No sound**: Check `sound` is not `"off"` in config

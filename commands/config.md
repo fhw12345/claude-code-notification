@@ -1,5 +1,5 @@
 ---
-description: View or modify notification plugin settings (sound, debug, notifyOn, etc.)
+description: View or modify notification plugin settings (notifyOn, sound, debug, etc.)
 argument-hint: "Optional: key=value to set, or 'show' to display current config"
 allowed-tools: ["Read", "Write", "Bash", "AskUserQuestion"]
 ---
@@ -24,7 +24,7 @@ The config file is at `$CLAUDE_PLUGIN_DATA/config.json` (environment variable `C
   "soundFile": "",
   "debug": false,
   "logFile": "",
-  "notifyOn": "Stop,Notification"
+  "notifyOn": "normal"
 }
 ```
 
@@ -33,24 +33,21 @@ The config file is at `$CLAUDE_PLUGIN_DATA/config.json` (environment variable `C
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `enabled` | bool | `true` | Master switch for all notifications |
+| `notifyOn` | string | `"normal"` | Notification level or custom event list |
 | `sound` | `"on"` / `"off"` | `"on"` | Play sound when notifying |
 | `soundFile` | string | `""` | Path to custom .wav file (empty = system sound) |
 | `debug` | bool | `false` | Enable debug logging |
 | `logFile` | string | `""` | Custom log file path (empty = plugin data dir) |
-| `notifyOn` | string | `"Stop,Notification"` | Comma-separated hook event types to notify on. Check log for available types. |
 
-### notifyOn values
+### notifyOn levels (inclusive)
 
-The value is a comma-separated list of CC hook event names. Known types:
+| Level | Events | Description |
+|-------|--------|-------------|
+| `all` | Stop, Notification, SubagentStop, SubagentStart, TeammateIdle, SessionStart, SessionEnd, StopFailure | Every event notifies |
+| `normal` | Stop, Notification, SubagentStop | Response done + needs input + subagent done |
+| `important` | Notification | Only permission_prompt and idle_prompt |
 
-- `Stop` — every assistant response
-- `Notification` — idle prompt, permission prompt, auth, etc.
-
-Users can check `notification.log` (with `debug=true`) to see all event types and their subtypes, then adjust `notifyOn` accordingly. Example:
-
-- `"Stop,Notification"` — notify on everything (default)
-- `"Notification"` — only notify on idle/permission events, not every response
-- `"Stop"` — only notify on responses, not idle events
+Users can also specify a custom comma-separated list: `"Stop,Notification,SubagentStop,TeammateIdle"`
 
 ## Instructions
 

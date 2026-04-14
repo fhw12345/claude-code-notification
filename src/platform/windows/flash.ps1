@@ -24,9 +24,21 @@ $dryRun       = (Get-Setting 'dryRun'    'CC_NOTIFY_DRY_RUN'    'false') -ieq '1
 $soundEnabled = (Get-Setting 'sound'     'CC_NOTIFY_SOUND'      'on') -ine 'off'
 $soundFile    =  Get-Setting 'soundFile' 'CC_NOTIFY_SOUND_FILE' ''
 $logFileCfg   =  Get-Setting 'logFile'   'CC_NOTIFY_LOG_FILE'   ''
-$notifyOn     =  Get-Setting 'notifyOn'  'CC_NOTIFY_ON'         'Stop,Notification'
-# Parse notifyOn into a set of lowercase event names
-$notifyOnSet  = @($notifyOn -split ',' | ForEach-Object { $_.Trim().ToLowerInvariant() } | Where-Object { $_ -ne '' })
+$notifyOn     =  Get-Setting 'notifyOn'  'CC_NOTIFY_ON'         'normal'
+
+# Resolve notifyOn level to event list
+$levelMap = @{
+    'all'       = @('stop','notification','subagentstop','subagentstart','teammateidle','sessionstart','sessionend','stopfailure')
+    'normal'    = @('stop','notification','subagentstop')
+    'important' = @('notification')
+}
+$notifyOnLower = $notifyOn.Trim().ToLowerInvariant()
+if ($levelMap.ContainsKey($notifyOnLower)) {
+    $notifyOnSet = $levelMap[$notifyOnLower]
+} else {
+    # Custom comma-separated list
+    $notifyOnSet = @($notifyOn -split ',' | ForEach-Object { $_.Trim().ToLowerInvariant() } | Where-Object { $_ -ne '' })
+}
 
 $workspaceName = $env:CC_NOTIFY_WORKSPACE_NAME
 if ([string]::IsNullOrWhiteSpace($workspaceName)) {
