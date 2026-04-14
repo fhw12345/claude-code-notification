@@ -16,10 +16,12 @@ When Claude Code finishes a response, the plugin:
 1. **Flashes the taskbar icon** (orange) of the host window
 2. **Plays a notification sound** (Windows system sound by default)
 
-Works with:
+Works with any Windows terminal host:
 
-- **Windows Terminal** — flashes the WT window
-- **VS Code** — flashes the VS Code window (integrated terminal)
+- **Windows Terminal**
+- **VS Code** integrated terminal
+- **PowerShell / CMD** windows
+- **JetBrains IDEs** and other apps with embedded terminals
 
 The flash continues until you switch back to the window, then auto-clears.
 
