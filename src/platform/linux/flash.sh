@@ -215,21 +215,30 @@ fi
 
 debug_log "startPid=$$ workspace=$workspace_name hookEvent=$hook_event_name"
 
+# --- Ensure DISPLAY is set for GUI operations ---
+if [ -z "${DISPLAY:-}" ]; then
+    export DISPLAY=:0
+fi
+
 # --- Focus check ---
 if ! $notify_when_focused; then
     focused=false
 
-    # Try xdotool
-    if command -v xdotool &>/dev/null; then
+    # Wayland: try gdbus to get active window title
+    if [ -n "${WAYLAND_DISPLAY:-}" ] || [ "$(loginctl show-session $(loginctl list-sessions --no-legend 2>/dev/null | head -1 | awk '{print $1}') -p Type --value 2>/dev/null)" = "wayland" ]; then
+        # On Wayland, focus detection is limited; skip and always notify
+        debug_log "wayland session detected, focus detection not available, proceeding"
+    # X11: try xdotool
+    elif command -v xdotool &>/dev/null; then
         active_window=$(xdotool getactivewindow getwindowname 2>/dev/null || true)
         if [ -n "$active_window" ] && [ -n "$workspace_name" ]; then
             if echo "$active_window" | grep -qi "$workspace_name"; then
                 focused=true
             fi
         fi
-    # Try xprop
+    # X11: try xprop
     elif command -v xprop &>/dev/null; then
-        active_hex=$(xprop -root _NET_ACTIVE_WINDOW 2>/dev/null | grep -oP '0x\w+' || true)
+        active_hex=$(xprop -root _NET_ACTIVE_WINDOW 2>/dev/null | grep -oE '0x[0-9a-f]+' || true)
         if [ -n "$active_hex" ]; then
             active_title=$(xprop -id "$active_hex" WM_NAME 2>/dev/null | sed 's/.*= "//;s/"$//' || true)
             if [ -n "$active_title" ] && [ -n "$workspace_name" ]; then
@@ -239,7 +248,7 @@ if ! $notify_when_focused; then
             fi
         fi
     else
-        debug_log "no focus detection tools available (xdotool, xprop), proceeding with notification"
+        debug_log "no focus detection tools available, proceeding with notification"
     fi
 
     if $focused; then
@@ -362,7 +371,11 @@ if [[ "$sound_enabled" == "true" ]]; then
 fi
 
 # --- Terminal bell (makes terminal tab flash/highlight) ---
-printf '\a' > /dev/tty 2>/dev/null || printf '\a'
+if [ -e /dev/tty ]; then
+    printf '\a' > /dev/tty 2>/dev/null || true
+else
+    printf '\a' 2>/dev/null || true
+fi
 debug_log "terminal bell sent"
 
 echo "notified"
