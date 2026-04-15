@@ -1,6 +1,6 @@
 # cc-plugin-notification
 
-Windows taskbar flash + sound notifications for Claude Code. Alerts you when Claude finishes responding — so you can switch away and come back when it's done.
+Desktop notifications for Claude Code — taskbar flash, sound, and native notifications. Alerts you when Claude finishes responding so you can switch away and come back when it's done.
 
 ## Install
 
@@ -11,19 +11,26 @@ claude plugin install cc-plugin-notification@cc-notification-marketplace
 
 ## What it does
 
-When Claude Code finishes a response, the plugin:
+When Claude Code finishes a response, the plugin sends a desktop notification:
 
-1. **Flashes the taskbar icon** (orange) of the host window
-2. **Plays a notification sound** (Windows system sound by default)
+| Platform | Notification | Sound |
+|----------|-------------|-------|
+| **Windows** | Taskbar icon flashes orange | System asterisk or custom .wav |
+| **macOS** | Native notification banner | System ping or custom sound |
+| **Linux** | Desktop notification (notify-send) | Freedesktop sound theme or custom |
 
-Works with any Windows terminal host:
+### Windows
 
-- **Windows Terminal**
-- **VS Code** integrated terminal
-- **PowerShell / CMD** windows
-- **JetBrains IDEs** and other apps with embedded terminals
+Works with any terminal host: Windows Terminal, VS Code, PowerShell, CMD, JetBrains IDEs.
+The taskbar flash continues until you switch back to the window, then auto-clears.
 
-The flash continues until you switch back to the window, then auto-clears.
+### macOS
+
+Shows a native macOS notification via osascript. Detects the frontmost terminal app (Terminal.app, iTerm2, VS Code, etc.) for focus checking.
+
+### Linux
+
+Uses notify-send (with zenity/dbus-send fallback). Sound via PulseAudio, ALSA, or canberra-gtk-play.
 
 ## Configuration
 
@@ -126,13 +133,19 @@ Environment variables take precedence over the config file:
 
 ## How it works
 
-The plugin registers hooks for all CC event types. On each event:
+The plugin registers hooks for all CC event types. A platform dispatcher (`src/notify.sh`) routes to the correct script:
 
-1. Checks if the event matches the `notifyOn` level
-2. Walks the process tree from the hook process up to the root
-3. Finds the outermost ancestor with a visible taskbar window (WindowsTerminal.exe, Code.exe, etc.)
-4. Calls `FlashWindowEx` on that window
-5. Plays a notification sound
+- **Windows**: `src/platform/windows/flash.ps1` — walks the process tree, finds the outermost host window, calls `FlashWindowEx`
+- **macOS**: `src/platform/macos/flash.sh` — shows native notification via `osascript`, plays sound via `afplay`
+- **Linux**: `src/platform/linux/flash.sh` — shows notification via `notify-send`, plays sound via PulseAudio/ALSA
+
+On each event:
+
+1. Loads config from `$CLAUDE_PLUGIN_DATA/config.json` with env var overrides
+2. Checks enabled, quiet hours, debounce, event type filter
+3. Checks focus (skip if host window is active, unless `notifyWhenFocused=true`)
+4. Sends platform-native notification
+5. Plays notification sound
 
 ## Logs
 
@@ -152,14 +165,16 @@ All hook payloads are logged to `~/.claude/plugins/data/cc-plugin-notification-.
 
 ## Roadmap
 
-- **Cross-platform support** — macOS (osascript/Dock bounce) and Linux (notify-send) notifications
 - **Toast notifications** — Windows toast popups with message preview
 - **Per-event sounds** — different sounds for different event types
 
 ## Requirements
 
-- Windows 10/11
-- PowerShell (ships with Windows)
+| Platform | Requirements |
+|----------|-------------|
+| Windows | Windows 10/11, PowerShell (built-in) |
+| macOS | macOS 10.14+, python3 (built-in) |
+| Linux | notify-send or zenity (most distros), python3 or jq |
 
 ## License
 

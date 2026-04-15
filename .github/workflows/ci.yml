@@ -1,0 +1,128 @@
+name: Cross-platform E2E Tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm test
+
+  test-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test flash.sh dry run
+        run: |
+          echo '{"hook_event_name":"Stop","last_assistant_message":"test"}' | \
+            CC_NOTIFY_DEBUG=1 CC_NOTIFY_DRY_RUN=1 CLAUDE_PLUGIN_DATA=/tmp/cc-notify-test \
+            bash src/platform/macos/flash.sh
+      - name: Test enabled=false
+        run: |
+          echo '{}' | \
+            CC_NOTIFY_DEBUG=1 CC_NOTIFY_ENABLED=false CLAUDE_PLUGIN_DATA=/tmp/cc-notify-test \
+            bash src/platform/macos/flash.sh
+      - name: Test quiet hours active
+        run: |
+          echo '{}' | \
+            CC_NOTIFY_DEBUG=1 CC_NOTIFY_DRY_RUN=1 CC_NOTIFY_QUIET_HOURS=00:00-23:59 \
+            CLAUDE_PLUGIN_DATA=/tmp/cc-notify-test \
+            bash src/platform/macos/flash.sh | grep -q "quiet hours active"
+      - name: Test notifyOn=important filters Stop
+        run: |
+          echo '{"hook_event_name":"Stop","last_assistant_message":"test"}' | \
+            CC_NOTIFY_DEBUG=1 CC_NOTIFY_DRY_RUN=1 CC_NOTIFY_ON=important \
+            CLAUDE_PLUGIN_DATA=/tmp/cc-notify-test2 \
+            bash src/platform/macos/flash.sh | grep -q "not in notifyOn"
+      - name: Test notifyOn=important allows Notification
+        run: |
+          echo '{"hook_event_name":"Notification","notification_type":"idle_prompt","message":"waiting"}' | \
+            CC_NOTIFY_DEBUG=1 CC_NOTIFY_DRY_RUN=1 CC_NOTIFY_ON=important \
+            CLAUDE_PLUGIN_DATA=/tmp/cc-notify-test3 \
+            bash src/platform/macos/flash.sh | grep -q "DRY_RUN"
+      - name: Test debounce
+        run: |
+          mkdir -p /tmp/cc-notify-debounce
+          touch /tmp/cc-notify-debounce/notification.lock
+          echo '{"hook_event_name":"Stop"}' | \
+            CC_NOTIFY_DEBUG=1 CC_NOTIFY_DRY_RUN=1 CC_NOTIFY_DEBOUNCE_MS=10000 \
+            CLAUDE_PLUGIN_DATA=/tmp/cc-notify-debounce \
+            bash src/platform/macos/flash.sh | grep -q "debounced"
+      - name: Test payload logging
+        run: |
+          mkdir -p /tmp/cc-notify-log
+          echo '{"hook_event_name":"Stop","last_assistant_message":"log test"}' | \
+            CC_NOTIFY_DRY_RUN=1 CLAUDE_PLUGIN_DATA=/tmp/cc-notify-log \
+            bash src/platform/macos/flash.sh
+          grep -q "hook_event_name" /tmp/cc-notify-log/notification.log
+      - name: Test notify.sh dispatcher routes to macOS
+        run: |
+          echo '{"hook_event_name":"Stop","last_assistant_message":"dispatch"}' | \
+            CC_NOTIFY_DEBUG=1 CC_NOTIFY_DRY_RUN=1 \
+            CLAUDE_PLUGIN_ROOT="$(pwd)" CLAUDE_PLUGIN_DATA=/tmp/cc-notify-dispatch \
+            bash src/notify.sh | grep -q "DRY_RUN"
+
+  test-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install notification tools
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libnotify-bin
+      - name: Test flash.sh dry run
+        run: |
+          echo '{"hook_event_name":"Stop","last_assistant_message":"test"}' | \
+            CC_NOTIFY_DEBUG=1 CC_NOTIFY_DRY_RUN=1 CLAUDE_PLUGIN_DATA=/tmp/cc-notify-test \
+            bash src/platform/linux/flash.sh
+      - name: Test enabled=false
+        run: |
+          echo '{}' | \
+            CC_NOTIFY_DEBUG=1 CC_NOTIFY_ENABLED=false CLAUDE_PLUGIN_DATA=/tmp/cc-notify-test \
+            bash src/platform/linux/flash.sh
+      - name: Test quiet hours active
+        run: |
+          echo '{}' | \
+            CC_NOTIFY_DEBUG=1 CC_NOTIFY_DRY_RUN=1 CC_NOTIFY_QUIET_HOURS=00:00-23:59 \
+            CLAUDE_PLUGIN_DATA=/tmp/cc-notify-test \
+            bash src/platform/linux/flash.sh | grep -q "quiet hours active"
+      - name: Test notifyOn=important filters Stop
+        run: |
+          echo '{"hook_event_name":"Stop","last_assistant_message":"test"}' | \
+            CC_NOTIFY_DEBUG=1 CC_NOTIFY_DRY_RUN=1 CC_NOTIFY_ON=important \
+            CLAUDE_PLUGIN_DATA=/tmp/cc-notify-test2 \
+            bash src/platform/linux/flash.sh | grep -q "not in notifyOn"
+      - name: Test notifyOn=important allows Notification
+        run: |
+          echo '{"hook_event_name":"Notification","notification_type":"idle_prompt","message":"waiting"}' | \
+            CC_NOTIFY_DEBUG=1 CC_NOTIFY_DRY_RUN=1 CC_NOTIFY_ON=important \
+            CLAUDE_PLUGIN_DATA=/tmp/cc-notify-test3 \
+            bash src/platform/linux/flash.sh | grep -q "DRY_RUN"
+      - name: Test debounce
+        run: |
+          mkdir -p /tmp/cc-notify-debounce
+          touch /tmp/cc-notify-debounce/notification.lock
+          echo '{"hook_event_name":"Stop"}' | \
+            CC_NOTIFY_DEBUG=1 CC_NOTIFY_DRY_RUN=1 CC_NOTIFY_DEBOUNCE_MS=10000 \
+            CLAUDE_PLUGIN_DATA=/tmp/cc-notify-debounce \
+            bash src/platform/linux/flash.sh | grep -q "debounced"
+      - name: Test payload logging
+        run: |
+          mkdir -p /tmp/cc-notify-log
+          echo '{"hook_event_name":"Stop","last_assistant_message":"log test"}' | \
+            CC_NOTIFY_DRY_RUN=1 CLAUDE_PLUGIN_DATA=/tmp/cc-notify-log \
+            bash src/platform/linux/flash.sh
+          grep -q "hook_event_name" /tmp/cc-notify-log/notification.log
+      - name: Test notify.sh dispatcher routes to Linux
+        run: |
+          echo '{"hook_event_name":"Stop","last_assistant_message":"dispatch"}' | \
+            CC_NOTIFY_DEBUG=1 CC_NOTIFY_DRY_RUN=1 \
+            CLAUDE_PLUGIN_ROOT="$(pwd)" CLAUDE_PLUGIN_DATA=/tmp/cc-notify-dispatch \
+            bash src/notify.sh | grep -q "DRY_RUN"
