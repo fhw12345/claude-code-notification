@@ -69,18 +69,13 @@ if [[ "$(echo "$sound_enabled" | tr '[:upper:]' '[:lower:]')" == "off" ]]; then
 fi
 
 # Resolve notifyOn level to event list
-declare -A level_map
-level_map[all]='stop,notification,subagentstop,subagentstart,teammateidle,sessionstart,sessionend,stopfailure'
-level_map[normal]='stop,notification,subagentstop'
-level_map[important]='notification'
-
 notify_on_lower=$(echo "$notify_on" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
-if [[ -n "${level_map[$notify_on_lower]+x}" ]]; then
-    notify_on_set="${level_map[$notify_on_lower]}"
-else
-    # Custom comma-separated list
-    notify_on_set="$notify_on_lower"
-fi
+case "$notify_on_lower" in
+    all)       notify_on_set='stop,notification,subagentstop,subagentstart,teammateidle,sessionstart,sessionend,stopfailure' ;;
+    normal)    notify_on_set='stop,notification,subagentstop' ;;
+    important) notify_on_set='notification' ;;
+    *)         notify_on_set="$notify_on_lower" ;;
+esac
 
 workspace_name="${CC_NOTIFY_WORKSPACE_NAME:-}"
 if [ -z "$workspace_name" ]; then
