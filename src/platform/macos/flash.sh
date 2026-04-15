@@ -225,13 +225,15 @@ fi
 
 # --- Build notification message ---
 message=""
-if [ -n "$hook_event_name" ]; then
-    case "$hook_event_name" in
+hook_event_lower=$(echo "$hook_event_name" | tr '[:upper:]' '[:lower:]')
+notification_type_lower=$(echo "$notification_type" | tr '[:upper:]' '[:lower:]')
+if [ -n "$hook_event_lower" ]; then
+    case "$hook_event_lower" in
         stop)
             message="Claude is done"
             ;;
         notification)
-            case "$notification_type" in
+            case "$notification_type_lower" in
                 permission_prompt) message="Claude needs your permission" ;;
                 idle_prompt)       message="Claude is waiting for you" ;;
                 *)                 message="Claude needs your attention" ;;
