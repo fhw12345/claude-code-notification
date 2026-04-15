@@ -362,4 +362,8 @@ if [[ "$sound_enabled" == "true" ]]; then
     fi
 fi
 
+# --- Terminal bell (makes terminal tab flash/highlight) ---
+printf '\a'
+debug_log "terminal bell sent"
+
 echo "notified"

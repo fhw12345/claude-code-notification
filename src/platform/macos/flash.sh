@@ -281,3 +281,7 @@ if $sound_flag; then
         debug_log "sound: system Ping"
     fi
 fi
+
+# --- Terminal bell (makes terminal tab flash/highlight) ---
+printf '\a'
+debug_log "terminal bell sent"
