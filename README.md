@@ -9,6 +9,14 @@ claude plugin marketplace add fhw12345/claude-code-notification
 claude plugin install cc-plugin-notification@cc-notification-marketplace
 ```
 
+## Update
+
+```
+claude plugins update cc-plugin-notification@cc-notification-marketplace
+```
+
+Restart Claude Code after updating to apply hook changes.
+
 ## What it does
 
 When Claude Code finishes a response, the plugin sends a desktop notification:
