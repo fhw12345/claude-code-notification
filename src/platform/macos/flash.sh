@@ -35,12 +35,14 @@ notify_when_focused_val=$(get_setting 'notifyWhenFocused' 'CC_NOTIFY_WHEN_FOCUSE
 
 # Boolean normalization
 is_true() {
-    local v="${1,,}"  # lowercase
+    local v
+    v=$(echo "$1" | tr '[:upper:]' '[:lower:]')  # lowercase
     [[ "$v" == "true" || "$v" == "1" ]]
 }
 
 is_false() {
-    local v="${1,,}"
+    local v
+    v=$(echo "$1" | tr '[:upper:]' '[:lower:]')
     [[ "$v" == "false" || "$v" == "0" ]]
 }
 
@@ -62,7 +64,7 @@ fi
 
 # sound: off means disabled
 sound_flag=true
-if [[ "${sound_enabled,,}" == "off" ]]; then
+if [[ "$(echo "$sound_enabled" | tr '[:upper:]' '[:lower:]')" == "off" ]]; then
     sound_flag=false
 fi
 

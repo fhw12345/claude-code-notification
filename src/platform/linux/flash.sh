@@ -37,8 +37,9 @@ quiet_hours=$(get_setting 'quietHours' 'CC_NOTIFY_QUIET_HOURS' '')
 notify_when_focused_val=$(get_setting 'notifyWhenFocused' 'CC_NOTIFY_WHEN_FOCUSED' 'false')
 
 # Normalize booleans
-is_true() { [[ "${1,,}" == "true" || "$1" == "1" ]]; }
-is_false() { [[ "${1,,}" == "false" || "$1" == "0" ]]; }
+_lower() { echo "$1" | tr '[:upper:]' '[:lower:]'; }
+is_true() { local v; v=$(_lower "$1"); [[ "$v" == "true" || "$v" == "1" ]]; }
+is_false() { local v; v=$(_lower "$1"); [[ "$v" == "false" || "$v" == "0" ]]; }
 
 debug_enabled=false
 is_true "$debug_val" && debug_enabled=true
@@ -50,7 +51,7 @@ notify_when_focused=false
 is_true "$notify_when_focused_val" && notify_when_focused=true
 
 # sound_enabled: 'off' means disabled
-if [[ "${sound_enabled,,}" == "off" ]]; then
+if [[ "$(_lower "$sound_enabled")" == "off" ]]; then
     sound_enabled="false"
 else
     sound_enabled="true"
