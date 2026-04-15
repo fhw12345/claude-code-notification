@@ -58,23 +58,20 @@ else
 fi
 
 # Resolve notifyOn level to event list
-declare -A level_map
-level_map[all]="stop notification subagentstop subagentstart teammateidle sessionstart sessionend stopfailure"
-level_map[normal]="stop notification subagentstop"
-level_map[important]="notification"
-
 notify_on_lower=$(echo "$notify_on" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
-if [[ -n "${level_map[$notify_on_lower]+x}" ]]; then
-    IFS=' ' read -ra notify_on_set <<< "${level_map[$notify_on_lower]}"
-else
-    # Custom comma-separated list
-    IFS=',' read -ra raw_set <<< "$notify_on"
-    notify_on_set=()
+case "$notify_on_lower" in
+    all)       IFS=' ' read -ra notify_on_set <<< "stop notification subagentstop subagentstart teammateidle sessionstart sessionend stopfailure" ;;
+    normal)    IFS=' ' read -ra notify_on_set <<< "stop notification subagentstop" ;;
+    important) IFS=' ' read -ra notify_on_set <<< "notification" ;;
+    *)
+        IFS=',' read -ra raw_set <<< "$notify_on"
+        notify_on_set=()
     for item in "${raw_set[@]}"; do
         trimmed=$(echo "$item" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
         [ -n "$trimmed" ] && notify_on_set+=("$trimmed")
     done
-fi
+    ;;
+esac
 
 workspace_name="${CC_NOTIFY_WORKSPACE_NAME:-}"
 if [ -z "$workspace_name" ]; then
@@ -365,7 +362,7 @@ if [[ "$sound_enabled" == "true" ]]; then
 fi
 
 # --- Terminal bell (makes terminal tab flash/highlight) ---
-printf '\a'
+printf '\a' > /dev/tty 2>/dev/null || printf '\a'
 debug_log "terminal bell sent"
 
 echo "notified"
