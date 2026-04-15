@@ -371,11 +371,7 @@ if [[ "$sound_enabled" == "true" ]]; then
 fi
 
 # --- Terminal bell (makes terminal tab flash/highlight) ---
-if [ -e /dev/tty ]; then
-    printf '\a' > /dev/tty 2>/dev/null || true
-else
-    printf '\a' 2>/dev/null || true
-fi
+printf '\a' > /dev/tty 2>/dev/null || printf '\a' 2>/dev/null || true
 debug_log "terminal bell sent"
 
 echo "notified"
