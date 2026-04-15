@@ -258,27 +258,37 @@ if $dry_run; then
 fi
 
 # --- Build notification message ---
-message="Claude Code"
+message=""
 if [ -n "$hook_event_name" ]; then
     case "$hook_event_name" in
         stop)
-            if [ -n "$stop_reason" ]; then
-                message="Claude Code: stopped ($stop_reason)"
-            else
-                message="Claude Code: task completed"
-            fi
+            message="Claude is done"
             ;;
         notification)
-            if [ -n "$notification_type" ]; then
-                message="Claude Code: $notification_type"
-            else
-                message="Claude Code: notification"
-            fi
+            case "$notification_type" in
+                permission_prompt) message="Claude needs your permission" ;;
+                idle_prompt)       message="Claude is waiting for you" ;;
+                *)                 message="Claude needs your attention" ;;
+            esac
+            ;;
+        subagentstop)
+            message="Agent task finished"
+            ;;
+        subagentstart)
+            message="Agent task started"
+            ;;
+        teammateidle)
+            message="Teammate is idle"
+            ;;
+        stopfailure)
+            message="Claude encountered an error"
             ;;
         *)
-            message="Claude Code: $hook_event_name"
+            message="Claude Code"
             ;;
     esac
+else
+    message="Claude Code"
 fi
 [ -n "$workspace_name" ] && message="[$workspace_name] $message"
 

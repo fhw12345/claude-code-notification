@@ -224,39 +224,37 @@ if ! $notify_when_focused; then
 fi
 
 # --- Build notification message ---
-message="Claude Code"
+message=""
 if [ -n "$hook_event_name" ]; then
     case "$hook_event_name" in
         stop)
-            if [ -n "$stop_reason" ]; then
-                message="Task completed: $stop_reason"
-            else
-                message="Task completed"
-            fi
+            message="Claude is done"
             ;;
         notification)
-            if [ -n "$notification_type" ]; then
-                message="Notification: $notification_type"
-            else
-                message="Needs your attention"
-            fi
+            case "$notification_type" in
+                permission_prompt) message="Claude needs your permission" ;;
+                idle_prompt)       message="Claude is waiting for you" ;;
+                *)                 message="Claude needs your attention" ;;
+            esac
             ;;
         subagentstop)
-            message="Sub-agent finished"
+            message="Agent task finished"
             ;;
         subagentstart)
-            message="Sub-agent started"
+            message="Agent task started"
             ;;
         teammateidle)
             message="Teammate is idle"
             ;;
         stopfailure)
-            message="Task failed"
+            message="Claude encountered an error"
             ;;
         *)
-            message="Event: $hook_event_name"
+            message="Claude Code"
             ;;
     esac
+else
+    message="Claude Code"
 fi
 
 if [ -n "$workspace_name" ]; then
