@@ -120,7 +120,16 @@ if (-not [string]::IsNullOrWhiteSpace($logFile) -and -not [string]::IsNullOrWhit
     Add-Content -LiteralPath $logFile -Value ("[" + (Get-Date -Format o) + "] payload: " + $stdinContent.Trim()) -ErrorAction SilentlyContinue
 }
 
-if ($hookEventName -ne '' -and $notifyOnSet -notcontains $hookEventName.ToLowerInvariant()) {
+# --- Session hwnd file path ---
+$sessionHwndPath = ''
+if (-not [string]::IsNullOrWhiteSpace($env:CLAUDE_PLUGIN_DATA)) {
+    $sessionHwndPath = Join-Path $env:CLAUDE_PLUGIN_DATA 'session_hwnd'
+}
+
+# --- Session hwnd: always handle SessionStart/SessionEnd for hwnd tracking ---
+$isSessionLifecycle = $hookEventName -ieq 'SessionStart' -or $hookEventName -ieq 'SessionEnd'
+
+if ($hookEventName -ne '' -and -not $isSessionLifecycle -and $notifyOnSet -notcontains $hookEventName.ToLowerInvariant()) {
     Write-DebugLog ("event '" + $hookEventName + "' not in notifyOn=[" + ($notifyOnSet -join ',') + "], skipping")
     exit 0
 }
@@ -177,8 +186,40 @@ public static class Win32Flash {
     [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
     [DllImport("user32.dll")] public static extern UInt32 GetWindowThreadProcessId(IntPtr hWnd, out UInt32 processId);
     [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+    [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow();
 }
 '@
+
+# --- SessionStart: capture foreground window hwnd for this session ---
+if ($hookEventName -ieq 'SessionStart' -and -not [string]::IsNullOrWhiteSpace($sessionHwndPath)) {
+    $fgHwnd = [Win32Flash]::GetForegroundWindow()
+    if ($fgHwnd -ne [IntPtr]::Zero) {
+        $fgTb = New-Object System.Text.StringBuilder 512
+        [void][Win32Flash]::GetWindowText($fgHwnd, $fgTb, $fgTb.Capacity)
+        $fgTitle = $fgTb.ToString()
+        $sessionData = $fgHwnd.ToString() + '|' + $fgTitle
+        $sessionDir = Split-Path -Parent $sessionHwndPath
+        if (-not [string]::IsNullOrWhiteSpace($sessionDir) -and -not (Test-Path -LiteralPath $sessionDir)) {
+            New-Item -ItemType Directory -Path $sessionDir -Force -ErrorAction SilentlyContinue | Out-Null
+        }
+        [System.IO.File]::WriteAllText($sessionHwndPath, $sessionData)
+        Write-DebugLog ("sessionStart: saved hwnd=" + $fgHwnd + " title=" + $fgTitle)
+    }
+}
+
+# --- SessionEnd: clean up session hwnd file ---
+if ($hookEventName -ieq 'SessionEnd' -and -not [string]::IsNullOrWhiteSpace($sessionHwndPath)) {
+    if ([System.IO.File]::Exists($sessionHwndPath)) {
+        Remove-Item -LiteralPath $sessionHwndPath -Force -ErrorAction SilentlyContinue
+        Write-DebugLog "sessionEnd: removed session_hwnd file"
+    }
+}
+
+# --- Exit early for session lifecycle events not in notifyOn ---
+if ($isSessionLifecycle -and $notifyOnSet -notcontains $hookEventName.ToLowerInvariant()) {
+    Write-DebugLog ("event '" + $hookEventName + "' handled for hwnd tracking, not in notifyOn, skipping notification")
+    exit 0
+}
 
 # --- Explicit target PID override ---
 $targetPidText = $env:CC_NOTIFY_TARGET_PID
@@ -235,6 +276,30 @@ $selectedPid = 0
 $hwnd = [IntPtr]::Zero
 $selectedTitle = ''
 
+# Priority 0: Saved session hwnd from SessionStart
+if (-not [string]::IsNullOrWhiteSpace($sessionHwndPath) -and [System.IO.File]::Exists($sessionHwndPath)) {
+    try {
+        $sessionData = [System.IO.File]::ReadAllText($sessionHwndPath).Trim()
+        $parts = $sessionData -split '\|', 2
+        $savedHwnd = [IntPtr]([long]$parts[0])
+        $savedTitle = if ($parts.Length -gt 1) { $parts[1] } else { '' }
+        if ($savedHwnd -ne [IntPtr]::Zero -and [Win32Flash]::IsWindowVisible($savedHwnd)) {
+            $hwnd = $savedHwnd
+            $savedPid = [uint32]0
+            [void][Win32Flash]::GetWindowThreadProcessId($savedHwnd, [ref]$savedPid)
+            $selectedPid = [int]$savedPid
+            $tb = New-Object System.Text.StringBuilder 512
+            [void][Win32Flash]::GetWindowText($savedHwnd, $tb, $tb.Capacity)
+            $selectedTitle = $tb.ToString()
+            Write-DebugLog ("sessionHwnd: hwnd=" + $savedHwnd + " PID=" + $selectedPid + " title=" + $selectedTitle + " (saved=" + $savedTitle + ")")
+        } else {
+            Write-DebugLog ("sessionHwnd: saved hwnd=" + $savedHwnd + " no longer visible, falling back")
+        }
+    } catch {
+        Write-DebugLog ("sessionHwnd: failed to read session_hwnd file: " + $_.Exception.Message)
+    }
+}
+
 # Priority 1: Explicit target PID
 if (-not [string]::IsNullOrWhiteSpace($targetPidText)) {
     $tpid = [int]$targetPidText
@@ -246,26 +311,49 @@ if (-not [string]::IsNullOrWhiteSpace($targetPidText)) {
     }
 }
 
-# Priority 2: Walk process chain, pick outermost (last) ancestor with a window
+# Priority 2: GetConsoleWindow — directly identifies the console for this process
+if ($hwnd -eq [IntPtr]::Zero) {
+    $consoleHwnd = [Win32Flash]::GetConsoleWindow()
+    if ($consoleHwnd -ne [IntPtr]::Zero) {
+        $hwnd = $consoleHwnd
+        $consolePid = [uint32]0
+        [void][Win32Flash]::GetWindowThreadProcessId($consoleHwnd, [ref]$consolePid)
+        $selectedPid = [int]$consolePid
+        $tb = New-Object System.Text.StringBuilder 512
+        [void][Win32Flash]::GetWindowText($consoleHwnd, $tb, $tb.Capacity)
+        $selectedTitle = $tb.ToString()
+        Write-DebugLog ("consoleWindow: hwnd=" + $consoleHwnd + " PID=" + $selectedPid + " title=" + $selectedTitle)
+    } else {
+        Write-DebugLog "consoleWindow: returned zero (pseudo-console, e.g. Windows Terminal)"
+    }
+}
+
+# Priority 3: Walk process chain, pick innermost (first) ancestor with a window
 if ($hwnd -eq [IntPtr]::Zero) {
     $workspaceNameLower = if ([string]::IsNullOrWhiteSpace($workspaceName)) { '' } else { $workspaceName.ToLowerInvariant() }
+    $cwdPath = (Get-Location).Path.ToLowerInvariant()
     foreach ($proc in $processChain) {
         if ($skipNames -contains $proc.Name.ToLowerInvariant()) { continue }
         if (-not $script:windowsByPid.ContainsKey($proc.ProcessId) -or $script:windowsByPid[$proc.ProcessId].Count -eq 0) { continue }
         $handles = $script:windowsByPid[$proc.ProcessId]
         $windowEntries = foreach ($handle in $handles) {
             $title = [string]$script:windowTitlesByHandle[$handle.ToString()]
+            $titleLower = $title.ToLowerInvariant()
+            $rank = 2
+            if (-not [string]::IsNullOrWhiteSpace($cwdPath) -and $titleLower.Contains($cwdPath)) { $rank = 0 }
+            elseif (-not [string]::IsNullOrWhiteSpace($workspaceNameLower) -and $titleLower.Contains($workspaceNameLower)) { $rank = 1 }
             [pscustomobject]@{
                 Handle = $handle
                 Title = $title
-                WorkspaceRank = if (-not [string]::IsNullOrWhiteSpace($workspaceNameLower) -and $title.ToLowerInvariant().Contains($workspaceNameLower)) { 0 } else { 1 }
+                WorkspaceRank = $rank
             }
         }
         $best = $windowEntries | Sort-Object WorkspaceRank, Title | Select-Object -First 1
         $selectedPid = $proc.ProcessId
         $hwnd = $best.Handle
         $selectedTitle = $best.Title
-        Write-DebugLog ("  candidate: PID=" + $proc.ProcessId + " Name=" + $proc.Name + " hwnd=" + $hwnd + " title=" + $selectedTitle)
+        Write-DebugLog ("  candidate: PID=" + $proc.ProcessId + " Name=" + $proc.Name + " hwnd=" + $hwnd + " title=" + $selectedTitle + " rank=" + $best.WorkspaceRank)
+        break
     }
 }
 

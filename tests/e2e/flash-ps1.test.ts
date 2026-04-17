@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 
 const flashScript = join(__dirname, "../../src/platform/windows/flash.ps1");
@@ -239,6 +239,138 @@ describe("flash.ps1 E2E", { timeout: 30000 }, () => {
       });
       expect(exitCode).toBe(0);
       expect(stdout).not.toContain("debounced");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("attempts GetConsoleWindow before process chain walk", () => {
+    const { stdout, exitCode } = runFlash({
+      CC_NOTIFY_TARGET_PID: "",
+      CLAUDE_PLUGIN_DATA: ""
+    });
+    expect([0, 2]).toContain(exitCode);
+    const triedConsole = stdout.includes("consoleWindow:");
+    expect(triedConsole).toBe(true);
+  });
+
+  it("falls back to process chain when GetConsoleWindow returns zero", () => {
+    const { stdout, exitCode } = runFlash({
+      CC_NOTIFY_TARGET_PID: "",
+      CLAUDE_PLUGIN_DATA: ""
+    });
+    expect([0, 2]).toContain(exitCode);
+    if (stdout.includes("consoleWindow: returned zero")) {
+      if (exitCode === 0) {
+        expect(stdout).toContain("candidate:");
+      }
+    }
+  });
+
+  it("prefers window title matching workspace name", () => {
+    const { stdout, exitCode } = runFlash({
+      CC_NOTIFY_TARGET_PID: "",
+      CLAUDE_PLUGIN_DATA: "",
+      CC_NOTIFY_WORKSPACE_NAME: "test-workspace-unique-name"
+    });
+    expect([0, 2]).toContain(exitCode);
+    if (exitCode === 0 && stdout.includes("candidate:")) {
+      expect(stdout).toContain("rank=");
+    }
+  });
+
+  it("uses innermost ancestor window (breaks on first match)", () => {
+    const { stdout, exitCode } = runFlash({
+      CC_NOTIFY_TARGET_PID: "",
+      CLAUDE_PLUGIN_DATA: ""
+    });
+    expect([0, 2]).toContain(exitCode);
+    if (exitCode === 0) {
+      const candidateLines = stdout.split("\n").filter(l => l.includes("candidate:"));
+      expect(candidateLines.length).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("SessionStart saves foreground window hwnd to session_hwnd file", () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "cc-notify-session-"));
+    try {
+      const { stdout, exitCode } = runFlash(
+        { CLAUDE_PLUGIN_DATA: tempDir, CC_NOTIFY_TARGET_PID: "" },
+        '{"hook_event_name":"SessionStart"}'
+      );
+      expect(exitCode).toBe(0);
+      expect(stdout).toContain("sessionStart: saved hwnd=");
+      const hwndFile = join(tempDir, "session_hwnd");
+      expect(existsSync(hwndFile)).toBe(true);
+      const content = readFileSync(hwndFile, "utf8");
+      // Format: hwnd|title
+      expect(content).toMatch(/^\d+\|/);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("SessionEnd removes session_hwnd file", () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "cc-notify-session-"));
+    const hwndFile = join(tempDir, "session_hwnd");
+    writeFileSync(hwndFile, "12345|Test Window");
+    try {
+      const { stdout, exitCode } = runFlash(
+        { CLAUDE_PLUGIN_DATA: tempDir, CC_NOTIFY_TARGET_PID: "" },
+        '{"hook_event_name":"SessionEnd"}'
+      );
+      expect(exitCode).toBe(0);
+      expect(stdout).toContain("sessionEnd: removed session_hwnd file");
+      expect(existsSync(hwndFile)).toBe(false);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("Stop event uses saved session hwnd when available", () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "cc-notify-session-"));
+    try {
+      // First: simulate SessionStart to capture hwnd
+      const startResult = runFlash(
+        { CLAUDE_PLUGIN_DATA: tempDir, CC_NOTIFY_TARGET_PID: "" },
+        '{"hook_event_name":"SessionStart"}'
+      );
+      expect(startResult.exitCode).toBe(0);
+      const hwndFile = join(tempDir, "session_hwnd");
+      expect(existsSync(hwndFile)).toBe(true);
+      const savedHwnd = readFileSync(hwndFile, "utf8").split("|")[0];
+
+      // Then: simulate Stop — should use the saved hwnd
+      const stopResult = runFlash(
+        {
+          CLAUDE_PLUGIN_DATA: tempDir,
+          CC_NOTIFY_TARGET_PID: "",
+          CC_NOTIFY_DEBOUNCE_MS: "0"
+        },
+        '{"hook_event_name":"Stop"}'
+      );
+      expect(stopResult.exitCode).toBe(0);
+      expect(stopResult.stdout).toContain("sessionHwnd: hwnd=" + savedHwnd);
+      expect(stopResult.stdout).toContain("selected: PID=");
+      expect(stopResult.stdout).toContain("DRY_RUN");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("SessionStart/SessionEnd bypass notifyOn filter for hwnd tracking", () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "cc-notify-session-"));
+    try {
+      // With notifyOn=important, SessionStart is NOT in the event list
+      // but should still save hwnd
+      const { stdout, exitCode } = runFlash(
+        { CLAUDE_PLUGIN_DATA: tempDir, CC_NOTIFY_ON: "important", CC_NOTIFY_TARGET_PID: "" },
+        '{"hook_event_name":"SessionStart"}'
+      );
+      expect(exitCode).toBe(0);
+      expect(stdout).toContain("sessionStart: saved hwnd=");
+      expect(stdout).toContain("handled for hwnd tracking");
+      expect(existsSync(join(tempDir, "session_hwnd"))).toBe(true);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
