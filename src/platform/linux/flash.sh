@@ -86,7 +86,7 @@ fi
 
 debug_log() {
     local msg="$1"
-    if $debug_enabled; then echo "$msg"; fi
+    if $debug_enabled; then echo "$msg" >&2; fi
     if [ -n "$log_file" ]; then
         local dir
         dir=$(dirname "$log_file")
@@ -373,5 +373,3 @@ fi
 # --- Terminal bell (makes terminal tab flash/highlight) ---
 (printf '\a' > /dev/tty) 2>/dev/null || printf '\a' 2>/dev/null || true
 debug_log "terminal bell sent"
-
-echo "notified"

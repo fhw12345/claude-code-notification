@@ -90,7 +90,7 @@ fi
 
 debug_log() {
     local msg="$1"
-    if $debug_enabled; then echo "$msg"; fi
+    if $debug_enabled; then echo "$msg" >&2; fi
     if [ -n "$log_file" ]; then
         local dir
         dir=$(dirname "$log_file")

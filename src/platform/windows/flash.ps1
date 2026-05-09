@@ -58,7 +58,7 @@ if ([string]::IsNullOrWhiteSpace($logFile) -and -not [string]::IsNullOrWhiteSpac
 }
 
 function Write-DebugLog($msg) {
-    if ($debugEnabled) { Write-Output $msg }
+    if ($debugEnabled) { [Console]::Error.WriteLine($msg) }
     if (-not [string]::IsNullOrWhiteSpace($logFile)) {
         $dir = Split-Path -Parent $logFile
         if (-not [string]::IsNullOrWhiteSpace($dir) -and -not (Test-Path -LiteralPath $dir)) {
@@ -386,7 +386,6 @@ $fw.uCount = 0
 $fw.dwTimeout = 0
 [void][Win32Flash]::FlashWindowEx([ref]$fw)
 Write-DebugLog ("flashed hwnd=" + $hwnd)
-Write-Output ('hwnd=' + $hwnd)
 
 # --- Sound ---
 if ($soundEnabled) {

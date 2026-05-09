@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -22,29 +22,24 @@ try {
 }
 
 function runFlash(env: Record<string, string>, stdin?: string): { stdout: string; exitCode: number } {
-  try {
-    const result = execFileSync(
-      "powershell",
-      ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", flashScript],
-      {
-        env: {
-          ...process.env,
-          CC_NOTIFY_DEBUG: "1",
-          CC_NOTIFY_WHEN_FOCUSED: "true",
-          CC_NOTIFY_DRY_RUN: "1",
-          CC_NOTIFY_TARGET_PID: testTargetPid,
-          ...env
-        },
-        input: stdin,
-        encoding: "utf8",
-        timeout: 30000
-      }
-    );
-    return { stdout: result, exitCode: 0 };
-  } catch (error: unknown) {
-    const err = error as { stdout?: string; status?: number };
-    return { stdout: err.stdout ?? "", exitCode: err.status ?? 1 };
-  }
+  const result = spawnSync(
+    "powershell",
+    ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", flashScript],
+    {
+      env: {
+        ...process.env,
+        CC_NOTIFY_DEBUG: "1",
+        CC_NOTIFY_WHEN_FOCUSED: "true",
+        CC_NOTIFY_DRY_RUN: "1",
+        CC_NOTIFY_TARGET_PID: testTargetPid,
+        ...env
+      },
+      input: stdin,
+      encoding: "utf8",
+      timeout: 30000
+    }
+  );
+  return { stdout: (result.stdout ?? "") + (result.stderr ?? ""), exitCode: result.status ?? 1 };
 }
 
 describe("flash.ps1 E2E", { timeout: 30000 }, () => {
