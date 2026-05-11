@@ -36,19 +36,19 @@ jobs:
           echo '{}' | \
             CC_NOTIFY_DEBUG=1 CC_NOTIFY_DRY_RUN=1 CC_NOTIFY_QUIET_HOURS=00:00-23:59 \
             CLAUDE_PLUGIN_DATA=/tmp/cc-notify-test \
-            bash src/platform/macos/flash.sh | grep -q "quiet hours active"
+            bash src/platform/macos/flash.sh 2>&1 | grep -q "quiet hours active"
       - name: Test notifyOn=important filters Stop
         run: |
           echo '{"hook_event_name":"Stop","last_assistant_message":"test"}' | \
             CC_NOTIFY_DEBUG=1 CC_NOTIFY_DRY_RUN=1 CC_NOTIFY_ON=important \
             CLAUDE_PLUGIN_DATA=/tmp/cc-notify-test2 \
-            bash src/platform/macos/flash.sh | grep -q "not in notifyOn"
+            bash src/platform/macos/flash.sh 2>&1 | grep -q "not in notifyOn"
       - name: Test notifyOn=important allows Notification
         run: |
           echo '{"hook_event_name":"Notification","notification_type":"idle_prompt","message":"waiting"}' | \
             CC_NOTIFY_DEBUG=1 CC_NOTIFY_DRY_RUN=1 CC_NOTIFY_ON=important \
             CLAUDE_PLUGIN_DATA=/tmp/cc-notify-test3 \
-            bash src/platform/macos/flash.sh | grep -q "DRY_RUN"
+            bash src/platform/macos/flash.sh 2>&1 | grep -q "DRY_RUN"
       - name: Test debounce
         run: |
           mkdir -p /tmp/cc-notify-debounce
@@ -56,7 +56,7 @@ jobs:
           echo '{"hook_event_name":"Stop"}' | \
             CC_NOTIFY_DEBUG=1 CC_NOTIFY_DRY_RUN=1 CC_NOTIFY_DEBOUNCE_MS=10000 \
             CLAUDE_PLUGIN_DATA=/tmp/cc-notify-debounce \
-            bash src/platform/macos/flash.sh | grep -q "debounced"
+            bash src/platform/macos/flash.sh 2>&1 | grep -q "debounced"
       - name: Test payload logging
         run: |
           mkdir -p /tmp/cc-notify-log
@@ -69,7 +69,7 @@ jobs:
           echo '{"hook_event_name":"Stop","last_assistant_message":"dispatch"}' | \
             CC_NOTIFY_DEBUG=1 CC_NOTIFY_DRY_RUN=1 \
             CLAUDE_PLUGIN_ROOT="$(pwd)" CLAUDE_PLUGIN_DATA=/tmp/cc-notify-dispatch \
-            bash src/notify.sh | grep -q "DRY_RUN"
+            bash src/notify.sh 2>&1 | grep -q "DRY_RUN"
 
   test-linux:
     runs-on: ubuntu-latest
@@ -92,19 +92,19 @@ jobs:
           echo '{}' | \
             CC_NOTIFY_DEBUG=1 CC_NOTIFY_DRY_RUN=1 CC_NOTIFY_QUIET_HOURS=00:00-23:59 \
             CLAUDE_PLUGIN_DATA=/tmp/cc-notify-test \
-            bash src/platform/linux/flash.sh | grep -q "quiet hours active"
+            bash src/platform/linux/flash.sh 2>&1 | grep -q "quiet hours active"
       - name: Test notifyOn=important filters Stop
         run: |
           echo '{"hook_event_name":"Stop","last_assistant_message":"test"}' | \
             CC_NOTIFY_DEBUG=1 CC_NOTIFY_DRY_RUN=1 CC_NOTIFY_ON=important \
             CLAUDE_PLUGIN_DATA=/tmp/cc-notify-test2 \
-            bash src/platform/linux/flash.sh | grep -q "not in notifyOn"
+            bash src/platform/linux/flash.sh 2>&1 | grep -q "not in notifyOn"
       - name: Test notifyOn=important allows Notification
         run: |
           echo '{"hook_event_name":"Notification","notification_type":"idle_prompt","message":"waiting"}' | \
             CC_NOTIFY_DEBUG=1 CC_NOTIFY_DRY_RUN=1 CC_NOTIFY_ON=important \
             CLAUDE_PLUGIN_DATA=/tmp/cc-notify-test3 \
-            bash src/platform/linux/flash.sh | grep -q "DRY_RUN"
+            bash src/platform/linux/flash.sh 2>&1 | grep -q "DRY_RUN"
       - name: Test debounce
         run: |
           mkdir -p /tmp/cc-notify-debounce
@@ -112,7 +112,7 @@ jobs:
           echo '{"hook_event_name":"Stop"}' | \
             CC_NOTIFY_DEBUG=1 CC_NOTIFY_DRY_RUN=1 CC_NOTIFY_DEBOUNCE_MS=10000 \
             CLAUDE_PLUGIN_DATA=/tmp/cc-notify-debounce \
-            bash src/platform/linux/flash.sh | grep -q "debounced"
+            bash src/platform/linux/flash.sh 2>&1 | grep -q "debounced"
       - name: Test payload logging
         run: |
           mkdir -p /tmp/cc-notify-log
@@ -125,4 +125,4 @@ jobs:
           echo '{"hook_event_name":"Stop","last_assistant_message":"dispatch"}' | \
             CC_NOTIFY_DEBUG=1 CC_NOTIFY_DRY_RUN=1 \
             CLAUDE_PLUGIN_ROOT="$(pwd)" CLAUDE_PLUGIN_DATA=/tmp/cc-notify-dispatch \
-            bash src/notify.sh | grep -q "DRY_RUN"
+            bash src/notify.sh 2>&1 | grep -q "DRY_RUN"
