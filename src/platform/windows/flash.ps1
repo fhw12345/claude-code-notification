@@ -191,19 +191,41 @@ public static class Win32Flash {
 '@
 
 # --- SessionStart: capture foreground window hwnd for this session ---
+# Only trust GetForegroundWindow if it belongs to a process in our ancestor chain.
+# Otherwise the user happened to have an unrelated window (e.g. VS, browser) focused
+# at the moment cc started, and we'd flash that window for the rest of the session.
 if ($hookEventName -ieq 'SessionStart' -and -not [string]::IsNullOrWhiteSpace($sessionHwndPath)) {
     $fgHwnd = [Win32Flash]::GetForegroundWindow()
     if ($fgHwnd -ne [IntPtr]::Zero) {
-        $fgTb = New-Object System.Text.StringBuilder 512
-        [void][Win32Flash]::GetWindowText($fgHwnd, $fgTb, $fgTb.Capacity)
-        $fgTitle = $fgTb.ToString()
-        $sessionData = $fgHwnd.ToString() + '|' + $fgTitle
-        $sessionDir = Split-Path -Parent $sessionHwndPath
-        if (-not [string]::IsNullOrWhiteSpace($sessionDir) -and -not (Test-Path -LiteralPath $sessionDir)) {
-            New-Item -ItemType Directory -Path $sessionDir -Force -ErrorAction SilentlyContinue | Out-Null
+        $fgPid = [uint32]0
+        [void][Win32Flash]::GetWindowThreadProcessId($fgHwnd, [ref]$fgPid)
+
+        # Build ancestor PID set for current process
+        $ancestorPids = New-Object 'System.Collections.Generic.HashSet[int]'
+        $walkPid = $PID
+        $walkSeen = New-Object 'System.Collections.Generic.HashSet[int]'
+        while ($walkPid -gt 0 -and $walkSeen.Add($walkPid)) {
+            [void]$ancestorPids.Add($walkPid)
+            $walkCim = Get-CimInstance Win32_Process -Filter ('ProcessId = ' + $walkPid) -ErrorAction SilentlyContinue
+            if (-not $walkCim) { break }
+            if ($walkCim.ParentProcessId -eq $walkPid) { break }
+            $walkPid = [int]$walkCim.ParentProcessId
         }
-        [System.IO.File]::WriteAllText($sessionHwndPath, $sessionData)
-        Write-DebugLog ("sessionStart: saved hwnd=" + $fgHwnd + " title=" + $fgTitle)
+
+        if ($ancestorPids.Contains([int]$fgPid)) {
+            $fgTb = New-Object System.Text.StringBuilder 512
+            [void][Win32Flash]::GetWindowText($fgHwnd, $fgTb, $fgTb.Capacity)
+            $fgTitle = $fgTb.ToString()
+            $sessionData = $fgHwnd.ToString() + '|' + $fgTitle
+            $sessionDir = Split-Path -Parent $sessionHwndPath
+            if (-not [string]::IsNullOrWhiteSpace($sessionDir) -and -not (Test-Path -LiteralPath $sessionDir)) {
+                New-Item -ItemType Directory -Path $sessionDir -Force -ErrorAction SilentlyContinue | Out-Null
+            }
+            [System.IO.File]::WriteAllText($sessionHwndPath, $sessionData)
+            Write-DebugLog ("sessionStart: saved hwnd=" + $fgHwnd + " PID=" + $fgPid + " title=" + $fgTitle)
+        } else {
+            Write-DebugLog ("sessionStart: foreground PID=" + $fgPid + " not in ancestor chain, skipping save (will use process-chain fallback)")
+        }
     }
 }
 
